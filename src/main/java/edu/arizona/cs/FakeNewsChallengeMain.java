@@ -822,7 +822,7 @@ public class FakeNewsChallengeMain {
 		
 		int[][] confusionMatrix;
 		//TODO
-		int correct = 0, incorrect = 0;
+		float correct = 0.0F, incorrect = 0.0F;
 		for(Headline headline:testingHeadlines) {
 			if(headline.correctlyClassed) {
 				correct++;
@@ -830,8 +830,8 @@ public class FakeNewsChallengeMain {
 				incorrect++;
 			}
 		}
-		System.out.println("Correct percentage was " + correct/testingHeadlines.size());
-		System.out.println("Incorrect percentage was " + incorrect/testingHeadlines.size());
+		System.out.println("Correct percentage was " + (float)correct/testingHeadlines.size());
+		System.out.println("Incorrect percentage was " + (float)incorrect/testingHeadlines.size());
 
 	}
 	
@@ -849,11 +849,11 @@ public class FakeNewsChallengeMain {
 		for(Headline headline:testingHeadlines) {
 //			String[] entries = (headline.headlineString+"#"+headline.bodyID+"#"+headline.getPredictedStance()).split("#");
 			String[] entries = new String[3];
-			entries[0]=headline.headlineString;
+			entries[0]=headline.originalHeadline;
 			entries[1]=headline.bodyID;
 			entries[2]=headline.getPredictedStance();
-			System.out.println(entries.length);
-			System.out.println(entries[0]+ " : " + entries[1] + " : ");// + entries[2]);
+//			System.out.println(entries.length);
+//			System.out.println(entries[0]+ " : " + entries[1] + " : ");// + entries[2]);
 			writer.writeNext(entries);
 		}
 		writer.close();
@@ -1076,6 +1076,7 @@ public class FakeNewsChallengeMain {
 		String bodyID;
 		Sentence theHeadline;
 		String headlineString = "";
+		String originalHeadline;
 		List<String> headlineStrings = new ArrayList<String>();
 
 		/*
@@ -1084,6 +1085,7 @@ public class FakeNewsChallengeMain {
 		public Headline(String headline, String bodyID, String stance) {
 			
 			//TODO make the realClass variable here!!
+			originalHeadline = headline;
 
 			Scanner headlineScanner = new Scanner(headline);
 			Sentence nlpHeadline = new Sentence(headline);
