@@ -148,10 +148,11 @@
       <!-- TODO: if your class takes command line arguments, change them here -->
       <arguments>
 	<argument>train_bodies.csv</argument>
-	<argument>train_stances_csc483583.csv</argument>
-	<argument>test_stances_csc483583.csv</argument>
+	<argument>train_stances.csv</argument>
         <argument>test_bodies.csv</argument>
         <argument>test_stances_unlabeled.csv</argument>
+        <argument>train_stances_csc483583.csv</argument>
+        <argument>test_stances_csc483583.csv</argument>
       </arguments>
     </configuration>
   </plugin>

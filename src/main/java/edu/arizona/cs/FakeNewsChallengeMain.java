@@ -68,11 +68,9 @@ public class FakeNewsChallengeMain {
 	static boolean priors = false;
 
 	// HashMap of the body of articles
-	static HashMap<String, MyDocument> trainArticles = new HashMap<String, MyDocument>();
-	// HashMap of the body of articles
-	static HashMap<String, MyDocument> testArticles = new HashMap<String, MyDocument>();
+	static HashMap<String, MyDocument> articles = new HashMap<String, MyDocument>();
 	// List of all headlines in the training set
-	static List<Headline> headlines = new ArrayList<Headline>();
+	static List<Headline> trainingHeadlines = new ArrayList<Headline>();
 	// List of all the headlines in the testing set
 	static List<Headline> testingHeadlines = new ArrayList<Headline>();
 	// List of the results of testing
@@ -116,16 +114,91 @@ public class FakeNewsChallengeMain {
 	static int numberOfHeadlines;
 
 	public static void main(String[] args) throws IOException, ParseException {
+		
+		
+		/****************************************
+		 * The first half - designing the model *
+		 ****************************************/
+		
+		String path_to_training_bodies, 
+		       path_to_training_stances, 
+		       path_to_testing_stances;
+		path_to_training_bodies = args[0];
+	    path_to_training_stances = args[4];
+	    path_to_testing_stances = args[5];
+		/*** Use the opencsv jar for reading the csv file ***/
+		// Read the bodies of the training data
+		System.out.println("Preprocessing the " + args[0] + " file");
+		CSVReader reader_bodies_train = new CSVReader(new FileReader(path_to_training_bodies));
+		String[] nextLine_bodies_train;
+		while ((nextLine_bodies_train = reader_bodies_train.readNext()) != null) {
+			String bodyID = nextLine_bodies_train[0];
+			String article = nextLine_bodies_train[1];
+			createTheTrainDocument(bodyID, article);
+		}
+		reader_bodies_train.close();
+		
+		// Read the headlines and stances of the training data
+		CSVReader reader_stances_training = new CSVReader(new FileReader(path_to_training_stances));
+		String[] nextLine_stances_training;
+		System.out.println("Preprocessing the " + args[4] + " file");
+		while ((nextLine_stances_training = reader_stances_training.readNext()) != null) {
+			String headline = nextLine_stances_training[0];
+			String bodyID = nextLine_stances_training[1];
+			String actualStance = nextLine_stances_training[2];
+			createTheTrainHeadline(headline, bodyID, actualStance);
+		}
+		reader_stances_training.close();
+		
+		// Preprocessing for Naive Bayes Training
+		preProcessForNBTraining();
+		System.out.println("Beginning training for preprocessed data");
+		try {
+			makeInstances();
+		} catch (Exception e1) {
+			e1.printStackTrace();
+		}
+		
+		System.out.println("Generating an .arff file for Weka");
+		generateArffFile("test_stances_csc483583.arff");
+		
+		// Read the headlines and stances of the testing data
+		CSVReader tester_stances_pretest = new CSVReader(new FileReader(path_to_testing_stances));
+		String[] tester_nextLine_stances_pretest;
+		System.out.println("Preprocessing the " + args[5] + " file");
+		while ((tester_nextLine_stances_pretest = tester_stances_pretest.readNext()) != null) {
+			String headline = tester_nextLine_stances_pretest[0];
+			String bodyID = tester_nextLine_stances_pretest[1];
+			String actualStance = tester_nextLine_stances_pretest[2];
+			createTheTestHeadline(headline, bodyID, actualStance);
+		}
+		tester_stances_pretest.close();
+		
+		// Preprocessing for Naive Bayes Testing
+		preProcessforNBTesting();
+		System.out.println("Beginning testing for preprocessed data");
+		try {
+			applyClassifyingModel();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		
+		System.out.println("Generating the output file from phase one, and computing the performance score");
+		generateOutputCSV("phase_one_testing.csv");
+		getFinalScore();
+		
+
+		/**************************************
+		 * The second half - official testing *
+		 **************************************/
 
 		// Strings for the relative paths to all three of the files
-		String path_to_training_bodies, path_to_training_stances, 
-		path_to_testing_stances, path_to_official_testing_bodies, 
-		path_to_official_testing_stances;
-		path_to_training_bodies = getRelativePath(args[0]);
-		path_to_training_stances = getRelativePath(args[1]);
-		path_to_testing_stances = getRelativePath(args[2]);
-		path_to_official_testing_bodies = getRelativePath(args[3]);
-		path_to_official_testing_stances = getRelativePath(args[4]);
+		String path_to_train_bodies, path_to_train_stances, 
+		       path_to_test_bodies, path_to_test_stances;
+		path_to_train_bodies = getRelativePath(args[0]);
+		path_to_train_stances = getRelativePath(args[1]);
+	    path_to_test_bodies = getRelativePath(args[2]);
+	    path_to_test_stances = getRelativePath(args[3]);;
 
 		// Start a timer for the training
 		Date startdate = new Date();
@@ -135,69 +208,45 @@ public class FakeNewsChallengeMain {
 		/*** Use the opencsv jar for reading the csv file ***/
 		// Read the bodies of the testing data
 		System.out.println("Preprocessing the " + args[0] + " file");
-		CSVReader reader_bodies = new CSVReader(new FileReader(path_to_training_bodies));
+		CSVReader reader_bodies = new CSVReader(new FileReader(path_to_train_bodies));
 		String[] nextLine_bodies;
 		while ((nextLine_bodies = reader_bodies.readNext()) != null) {
 			String bodyID = nextLine_bodies[0];
 			String article = nextLine_bodies[1];
-			createTheDocument(bodyID, article);
+			createTheTrainDocument(bodyID, article);
 		}
 		reader_bodies.close();
 		
 		/*** Use the opencsv jar for reading the csv file ***/
 		// Read the bodies of the testing data
-		System.out.println("Preprocessing the " + args[3] + " file");
-		CSVReader reader_bodies_official = new CSVReader(new FileReader(path_to_training_bodies));
+		System.out.println("Preprocessing the " + args[2] + " file");
+		CSVReader reader_bodies_official = new CSVReader(new FileReader(path_to_test_bodies));
 		String[] nextLine_bodies_official;
 		while ((nextLine_bodies_official = reader_bodies_official.readNext()) != null) {
 			String bodyID = nextLine_bodies_official[0];
 			String article = nextLine_bodies_official[1];
-			createTheDocument(bodyID, article);
+			createTheTrainDocument(bodyID, article);
 		}
 		reader_bodies_official.close();
+		
+		// There should be 2587 articles
+		System.out.println("There are " + articles.size() + " articles");
 
 		// Read the headlines and stances of the testing data
-		CSVReader reader_stances = new CSVReader(new FileReader(path_to_training_stances));
+		CSVReader reader_stances = new CSVReader(new FileReader(path_to_train_stances));
 		String[] nextLine_stances;
 		System.out.println("Preprocessing the " + args[1] + " file");
 		while ((nextLine_stances = reader_stances.readNext()) != null) {
 			String headline = nextLine_stances[0];
 			String bodyID = nextLine_stances[1];
 			String actualStance = nextLine_stances[2];
-			createTheHeadline(headline, bodyID, actualStance);
+			createTheTrainHeadline(headline, bodyID, actualStance);
 		}
 		reader_stances.close();
-		
-		// Read the headlines and stances of the testing data
-		CSVReader reader_stances_additional = new CSVReader(new FileReader(path_to_training_stances));
-		String[] nextLine_stances_additional;
-		System.out.println("Preprocessing the " + args[2] + " file");
-		while ((nextLine_stances_additional = reader_stances_additional.readNext()) != null) {
-			String headline = nextLine_stances_additional[0];
-			String bodyID = nextLine_stances_additional[1];
-			String actualStance = nextLine_stances_additional[2];
-			createTheHeadline(headline, bodyID, actualStance);
-		}
-		reader_stances_additional.close();
 
 		DecimalFormat intFormat = new DecimalFormat("#");
 
-		/*
-		// Now that the training bodies and training headlines have been parsed
-		// and lemmatized, begin Naive Bayes training for the set of training
-		// data.
-		StandardAnalyzer analyzer = new StandardAnalyzer();
-		Directory index = new RAMDirectory();
-		IndexWriterConfig config = new IndexWriterConfig(analyzer);
-		IndexWriter w = new IndexWriter(index, config);
-		// Add indexing for tf-idf similarity between Headline and Document
-		for (String bodyID : articles.keySet()) {
-			addDoc(w, bodyID, articles.get(bodyID).getArticleString());
-		}
-		w.close();
-		*/
-
-		numberOfHeadlines = headlines.size();
+		numberOfHeadlines = trainingHeadlines.size();
 
 		preProcessForNBTraining();
 		
@@ -229,9 +278,9 @@ public class FakeNewsChallengeMain {
 		System.out.println("Beginning testing at " + testStart.toString());
 
 		// Read the headlines and stances of the testing data
-		CSVReader tester_stances = new CSVReader(new FileReader(path_to_testing_stances));
-		String[] tester_nextLine_stances; //TODO
-		System.out.println("Preprocessing the " + args[4] + " file");
+		CSVReader tester_stances = new CSVReader(new FileReader(path_to_test_stances));
+		String[] tester_nextLine_stances;
+		System.out.println("Preprocessing the " + args[3] + " file");
 		while ((tester_nextLine_stances = tester_stances.readNext()) != null) {
 			String headline = tester_nextLine_stances[0];
 			String bodyID = tester_nextLine_stances[1];
@@ -319,7 +368,7 @@ public class FakeNewsChallengeMain {
 		// Set class index
 		training_set.setClassIndex(fvWekaAttributes.size() - 1);
 
-		for (Headline headline : headlines) {
+		for (Headline headline : trainingHeadlines) {
 			if (!headline.getBodyID().equals("Body ID")) {
 				if (headline.related) {
 					// Create the instance
@@ -489,7 +538,7 @@ public class FakeNewsChallengeMain {
 			fw = new FileWriter(filename);
 			bw = new BufferedWriter(fw);
 			bw.write(header);
-			for (Headline headline : headlines) {
+			for (Headline headline : trainingHeadlines) {
 				if (counter % loadScreen == 0) {
 					System.out.print("#");
 				}
@@ -520,7 +569,7 @@ public class FakeNewsChallengeMain {
 		// Preprocess for each headline in the list
 				for (Headline headline : testingHeadlines) {
 					// Calculate the different scores for the four classes
-					MyDocument mappedDoc = trainArticles.get(headline.getBodyID());
+					MyDocument mappedDoc = articles.get(headline.getBodyID());
 					float tf_idf = (float) 0.0;
 					StandardAnalyzer analyzer = new StandardAnalyzer();
 					Directory index = new RAMDirectory();
@@ -652,9 +701,9 @@ public class FakeNewsChallengeMain {
 		}
 
 		// Preprocess for each headline in the list
-		for (Headline headline : headlines) {
+		for (Headline headline : trainingHeadlines) {
 			// Calculate the different scores for the four classes
-			MyDocument mappedDoc = trainArticles.get(headline.getBodyID());
+			MyDocument mappedDoc = articles.get(headline.getBodyID());
 			float tf_idf = (float) 0.0;
 			StandardAnalyzer analyzer = new StandardAnalyzer();
 			Directory index = new RAMDirectory();
@@ -722,6 +771,7 @@ public class FakeNewsChallengeMain {
 				if(headline.actualStance.equals("unrelated")) {
 					headline.correctlyClassed=true;
 					headline.setCorrectlyClassified();
+					headline.predictedClass=0.0F;
 				}
 			}
 
@@ -776,23 +826,25 @@ public class FakeNewsChallengeMain {
 	 * Called to create a Document, which is the article associated with a news
 	 * headline. It uses a HashMap for speedy lookup
 	 **/
-	public static void createTheDocument(String bodyID, String theArticle) {
+	public static void createTheTrainDocument(String bodyID, String theArticle) {
 		theArticle = theArticle.replaceAll("\\r\\n|\\r|\\n", " ");
 		MyDocument d = null;
-		if (trainArticles.containsKey(bodyID)) {
-			d = (MyDocument) trainArticles.get(bodyID);
-		} else {
-			d = new MyDocument(theArticle, bodyID);
-			trainArticles.put(bodyID, d);
+		if(!bodyID.equals("Body ID")) {
+			if (articles.containsKey(bodyID)) {
+				d = (MyDocument) articles.get(bodyID);
+			} else {
+				d = new MyDocument(theArticle, bodyID);
+				articles.put(bodyID, d);
+			}	
 		}
 	}
 
 	/**
 	 * Called to create a headline for the training headlines List of headlines
 	 **/
-	public static void createTheHeadline(String headline, String bodyID, String actualStance) {
+	public static void createTheTrainHeadline(String headline, String bodyID, String actualStance) {
 		Headline h = new Headline(headline, bodyID, actualStance);
-		headlines.add(h);
+		trainingHeadlines.add(h);
 	}
 
 	/**
@@ -850,9 +902,10 @@ public class FakeNewsChallengeMain {
 	 * out by the scroing mechanism. The output is as follows, in a .csv file:
 	 * "headline", "bodyID", "predicted stance", "classification score"
 	 */
-	public static void generateOutputCSV() throws IOException {
+	public static void generateOutputCSV(String filename) throws IOException {
 		
-		CSVWriter writer = new CSVWriter(new FileWriter("test_results.csv"), '\t');
+//		CSVWriter writer = new CSVWriter(new FileWriter("test_results.csv"), '\t');
+		CSVWriter writer = new CSVWriter(new FileWriter(filename), ',');
 		// feed in your array (or convert your data to an array)
 		System.out.println("Size of the testing results is " + testingResults.size());
 		for(Headline headline : testingResults) {
@@ -863,6 +916,20 @@ public class FakeNewsChallengeMain {
 			writer.writeNext(entries);
 		}
 		writer.close();
+		
+		
+		BufferedWriter br = new BufferedWriter(new FileWriter("test_results_other.csv"));
+		StringBuilder sb = new StringBuilder();
+		  
+		for(Headline headline:testingResults) {
+			sb.append(headline.originalHeadline + '\t');
+			sb.append(headline.bodyID + '\t');
+			sb.append(headline.getPredictedStance() + '\n');
+		}		
+		  
+		br.write(sb.toString());
+		br.close();
+		
 	}
 
 	/**************************************************************************
