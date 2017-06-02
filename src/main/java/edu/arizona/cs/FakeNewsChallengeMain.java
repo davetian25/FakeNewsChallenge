@@ -2,14 +2,9 @@ package edu.arizona.cs;
 
 //Standard Java imports for File I/O and utilities
 import java.io.BufferedWriter;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -73,12 +68,14 @@ public class FakeNewsChallengeMain {
 	static boolean priors = false;
 
 	// HashMap of the body of articles
-	static HashMap<String, MyDocument> articles = new HashMap<String, MyDocument>();
+	static HashMap<String, MyDocument> trainArticles = new HashMap<String, MyDocument>();
+	// HashMap of the body of articles
+	static HashMap<String, MyDocument> testArticles = new HashMap<String, MyDocument>();
 	// List of all headlines in the training set
 	static List<Headline> headlines = new ArrayList<Headline>();
 	// List of all the headlines in the testing set
 	static List<Headline> testingHeadlines = new ArrayList<Headline>();
-	
+	// List of the results of testing
 	static List<Headline> testingResults = new ArrayList<Headline>();
 
 	/** The counters for prior probabilities **/
@@ -121,10 +118,14 @@ public class FakeNewsChallengeMain {
 	public static void main(String[] args) throws IOException, ParseException {
 
 		// Strings for the relative paths to all three of the files
-		String path_to_training_bodies, path_to_training_stances, path_to_testing_stances;
+		String path_to_training_bodies, path_to_training_stances, 
+		path_to_testing_stances, path_to_official_testing_bodies, 
+		path_to_official_testing_stances;
 		path_to_training_bodies = getRelativePath(args[0]);
 		path_to_training_stances = getRelativePath(args[1]);
 		path_to_testing_stances = getRelativePath(args[2]);
+		path_to_official_testing_bodies = getRelativePath(args[3]);
+		path_to_official_testing_stances = getRelativePath(args[4]);
 
 		// Start a timer for the training
 		Date startdate = new Date();
@@ -142,6 +143,18 @@ public class FakeNewsChallengeMain {
 			createTheDocument(bodyID, article);
 		}
 		reader_bodies.close();
+		
+		/*** Use the opencsv jar for reading the csv file ***/
+		// Read the bodies of the testing data
+		System.out.println("Preprocessing the " + args[3] + " file");
+		CSVReader reader_bodies_official = new CSVReader(new FileReader(path_to_training_bodies));
+		String[] nextLine_bodies_official;
+		while ((nextLine_bodies_official = reader_bodies_official.readNext()) != null) {
+			String bodyID = nextLine_bodies_official[0];
+			String article = nextLine_bodies_official[1];
+			createTheDocument(bodyID, article);
+		}
+		reader_bodies_official.close();
 
 		// Read the headlines and stances of the testing data
 		CSVReader reader_stances = new CSVReader(new FileReader(path_to_training_stances));
@@ -154,6 +167,18 @@ public class FakeNewsChallengeMain {
 			createTheHeadline(headline, bodyID, actualStance);
 		}
 		reader_stances.close();
+		
+		// Read the headlines and stances of the testing data
+		CSVReader reader_stances_additional = new CSVReader(new FileReader(path_to_training_stances));
+		String[] nextLine_stances_additional;
+		System.out.println("Preprocessing the " + args[2] + " file");
+		while ((nextLine_stances_additional = reader_stances_additional.readNext()) != null) {
+			String headline = nextLine_stances_additional[0];
+			String bodyID = nextLine_stances_additional[1];
+			String actualStance = nextLine_stances_additional[2];
+			createTheHeadline(headline, bodyID, actualStance);
+		}
+		reader_stances_additional.close();
 
 		DecimalFormat intFormat = new DecimalFormat("#");
 
@@ -177,15 +202,12 @@ public class FakeNewsChallengeMain {
 		preProcessForNBTraining();
 		
 		System.out.println("Beginning Naive Bayes training on preprocessed data");
-		try {// Comment out if not working
-			loadPersistentClassifier();// Comment out if not working
-		} catch (ClassNotFoundException e) {// Comment out if not working
-			try {
-				makeInstances();
-			} catch (Exception e1) {
-				e1.printStackTrace();
-			}
-		}// Comment out if not working
+		
+		try {
+			makeInstances();
+		} catch (Exception e1) {
+			e1.printStackTrace();
+		}
 
 		// End the timer for training, and calculate the time taken for training
 		Date enddate = new Date();
@@ -199,7 +221,6 @@ public class FakeNewsChallengeMain {
 
 		System.out.println("Generating an .arff file for Weka");
 		generateArffFile("test_stances_csc483583.arff");
-		makePersistentClassifier();
 
 		// Begin testing on the data set, keeping track of the important metrics
 		// for performance
@@ -209,8 +230,8 @@ public class FakeNewsChallengeMain {
 
 		// Read the headlines and stances of the testing data
 		CSVReader tester_stances = new CSVReader(new FileReader(path_to_testing_stances));
-		String[] tester_nextLine_stances;
-		System.out.println("Preprocessing the " + args[2] + " file");
+		String[] tester_nextLine_stances; //TODO
+		System.out.println("Preprocessing the " + args[4] + " file");
 		while ((tester_nextLine_stances = tester_stances.readNext()) != null) {
 			String headline = tester_nextLine_stances[0];
 			String bodyID = tester_nextLine_stances[1];
@@ -253,21 +274,6 @@ public class FakeNewsChallengeMain {
 		getFinalScore();
 		generateOutputCSV();
 
-	}
-
-	public static void makePersistentClassifier() throws FileNotFoundException, IOException {
-		 // serialize model
-		 ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream("/NB.model"));
-		 oos.writeObject(cModel);
-		 oos.flush();
-		 oos.close();
-	}
-	
-	public static void loadPersistentClassifier() throws IOException, ClassNotFoundException {
-		 // deserialize model
-		 ObjectInputStream ois = new ObjectInputStream(new FileInputStream("/NB.model"));
-		 cModel = (Classifier) ois.readObject();
-		 ois.close();
 	}
 
 	/**
@@ -514,7 +520,7 @@ public class FakeNewsChallengeMain {
 		// Preprocess for each headline in the list
 				for (Headline headline : testingHeadlines) {
 					// Calculate the different scores for the four classes
-					MyDocument mappedDoc = articles.get(headline.getBodyID());
+					MyDocument mappedDoc = trainArticles.get(headline.getBodyID());
 					float tf_idf = (float) 0.0;
 					StandardAnalyzer analyzer = new StandardAnalyzer();
 					Directory index = new RAMDirectory();
@@ -648,7 +654,7 @@ public class FakeNewsChallengeMain {
 		// Preprocess for each headline in the list
 		for (Headline headline : headlines) {
 			// Calculate the different scores for the four classes
-			MyDocument mappedDoc = articles.get(headline.getBodyID());
+			MyDocument mappedDoc = trainArticles.get(headline.getBodyID());
 			float tf_idf = (float) 0.0;
 			StandardAnalyzer analyzer = new StandardAnalyzer();
 			Directory index = new RAMDirectory();
@@ -773,11 +779,11 @@ public class FakeNewsChallengeMain {
 	public static void createTheDocument(String bodyID, String theArticle) {
 		theArticle = theArticle.replaceAll("\\r\\n|\\r|\\n", " ");
 		MyDocument d = null;
-		if (articles.containsKey(bodyID)) {
-			d = (MyDocument) articles.get(bodyID);
+		if (trainArticles.containsKey(bodyID)) {
+			d = (MyDocument) trainArticles.get(bodyID);
 		} else {
 			d = new MyDocument(theArticle, bodyID);
-			articles.put(bodyID, d);
+			trainArticles.put(bodyID, d);
 		}
 	}
 
@@ -819,7 +825,7 @@ public class FakeNewsChallengeMain {
 	 */
 	public static void getFinalScore() {
 		
-		int[][] confusionMatrix;
+		int[][] confusionMatrix = new int[4][4];
 		float correct = 0.0F, incorrect = 0.0F;
 		for(Headline headline:testingResults) {
 			if(headline.correctlyClassed) {
@@ -827,9 +833,15 @@ public class FakeNewsChallengeMain {
 			} else {
 				incorrect++;
 			}
+			confusionMatrix[(int) headline.realClass][(int) headline.predictedClass]++;
 		}
 		System.out.println("Correct percentage was " + (float)correct/testingResults.size());
 		System.out.println("Incorrect percentage was " + (float)incorrect/testingResults.size());
+		
+		System.out.println(confusionMatrix[0][0] + " | " + confusionMatrix[0][1] + " | " + confusionMatrix[0][2] + " | " + confusionMatrix[0][3]);
+		System.out.println(confusionMatrix[1][0] + " | " + confusionMatrix[1][1] + " | " + confusionMatrix[1][2] + " | " + confusionMatrix[1][3]);
+		System.out.println(confusionMatrix[2][0] + " | " + confusionMatrix[2][1] + " | " + confusionMatrix[2][2] + " | " + confusionMatrix[2][3]);
+		System.out.println(confusionMatrix[3][0] + " | " + confusionMatrix[3][1] + " | " + confusionMatrix[3][2] + " | " + confusionMatrix[3][3]);
 
 	}
 	
@@ -840,7 +852,7 @@ public class FakeNewsChallengeMain {
 	 */
 	public static void generateOutputCSV() throws IOException {
 		
-		CSVWriter writer = new CSVWriter(new FileWriter("yourfile.csv"), '\t');
+		CSVWriter writer = new CSVWriter(new FileWriter("test_results.csv"), '\t');
 		// feed in your array (or convert your data to an array)
 		System.out.println("Size of the testing results is " + testingResults.size());
 		for(Headline headline : testingResults) {
