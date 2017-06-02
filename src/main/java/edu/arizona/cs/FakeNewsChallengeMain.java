@@ -123,9 +123,9 @@ public class FakeNewsChallengeMain {
 		String path_to_training_bodies, 
 		       path_to_training_stances, 
 		       path_to_testing_stances;
-		path_to_training_bodies = args[0];
-	    path_to_training_stances = args[4];
-	    path_to_testing_stances = args[5];
+		path_to_training_bodies = getRelativePath(args[0]);
+	    path_to_training_stances = getRelativePath(args[4]);
+	    path_to_testing_stances = getRelativePath(args[5]);
 		/*** Use the opencsv jar for reading the csv file ***/
 		// Read the bodies of the training data
 		System.out.println("Preprocessing the " + args[0] + " file");
@@ -918,7 +918,7 @@ public class FakeNewsChallengeMain {
 		writer.close();
 		
 		
-		BufferedWriter br = new BufferedWriter(new FileWriter("test_results_other.csv"));
+		BufferedWriter br = new BufferedWriter(new FileWriter("other" + filename));
 		StringBuilder sb = new StringBuilder();
 		  
 		for(Headline headline:testingResults) {
