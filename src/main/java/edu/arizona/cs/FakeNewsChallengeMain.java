@@ -5,10 +5,8 @@ import java.io.BufferedWriter;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Properties;
@@ -56,17 +54,6 @@ import weka.core.Instances;
 
 public class FakeNewsChallengeMain {
 
-	/*
-	 * Booleans used for debugging purposes -- turn on individual boolean values
-	 * to see print statements in their respective methods
-	 */
-	static boolean debug = false;
-	static boolean articlePrint = false;
-	static boolean headlinePrint = false;
-	static boolean printTrain = false;
-	static boolean printTest = false;
-	static boolean priors = false;
-
 	// HashMap of the body of articles
 	static HashMap<String, MyDocument> articles = new HashMap<String, MyDocument>();
 	// List of all headlines in the training set
@@ -75,6 +62,14 @@ public class FakeNewsChallengeMain {
 	static List<Headline> testingHeadlines = new ArrayList<Headline>();
 	// List of the results of testing
 	static List<Headline> testingResults = new ArrayList<Headline>();
+	
+	// HashMap of official data documents
+	static HashMap<String, MyDocument> officialArticles = new HashMap<String, MyDocument>();
+	// List of official headline stances
+	static List<Headline> officialHeadlines = new ArrayList<Headline>();
+	// List of the official results of testing
+	static List<Headline> officialResults = new ArrayList<Headline>();
+
 
 	/** The counters for prior probabilities **/
 	static float headcount = 0;
@@ -151,10 +146,10 @@ public class FakeNewsChallengeMain {
 		reader_stances_training.close();
 		
 		// Preprocessing for Naive Bayes Training
-		preProcessForNBTraining();
+		preProcessForNBTraining(1);
 		System.out.println("Beginning training for preprocessed data");
 		try {
-			makeInstances();
+			makeInstances(1);
 		} catch (Exception e1) {
 			e1.printStackTrace();
 		}
@@ -175,17 +170,17 @@ public class FakeNewsChallengeMain {
 		tester_stances_pretest.close();
 		
 		// Preprocessing for Naive Bayes Testing
-		preProcessforNBTesting();
+		preProcessforNBTesting(1);
 		System.out.println("Beginning testing for preprocessed data");
 		try {
-			applyClassifyingModel();
+			applyClassifyingModel(1);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		
 		System.out.println("Generating the output file from phase one, and computing the performance score");
 		generateOutputCSV("phase_one_testing.csv");
-		getFinalScore();
+		getFinalScore(1);
 		
 
 		/**************************************
@@ -193,135 +188,46 @@ public class FakeNewsChallengeMain {
 		 **************************************/
 
 		// Strings for the relative paths to all three of the files
-		String path_to_train_bodies, path_to_train_stances, 
-		       path_to_test_bodies, path_to_test_stances;
-		path_to_train_bodies = getRelativePath(args[0]);
-		path_to_train_stances = getRelativePath(args[1]);
-	    path_to_test_bodies = getRelativePath(args[2]);
-	    path_to_test_stances = getRelativePath(args[3]);;
-
-		// Start a timer for the training
-		Date startdate = new Date();
-		float trainStartTime = startdate.getTime();
-		System.out.println("Beginning training at " + startdate.toString());
+		String official_test_bodies, official_test_stances;
+		official_test_bodies = getRelativePath(args[2]);
+		official_test_stances = getRelativePath(args[3]);
 
 		/*** Use the opencsv jar for reading the csv file ***/
-		// Read the bodies of the testing data
-		System.out.println("Preprocessing the " + args[0] + " file");
-		CSVReader reader_bodies = new CSVReader(new FileReader(path_to_train_bodies));
-		String[] nextLine_bodies;
-		while ((nextLine_bodies = reader_bodies.readNext()) != null) {
-			String bodyID = nextLine_bodies[0];
-			String article = nextLine_bodies[1];
-			createTheTrainDocument(bodyID, article);
-		}
-		reader_bodies.close();
-		
-		/*** Use the opencsv jar for reading the csv file ***/
-		// Read the bodies of the testing data
+		// Read the bodies of the official data
 		System.out.println("Preprocessing the " + args[2] + " file");
-		CSVReader reader_bodies_official = new CSVReader(new FileReader(path_to_test_bodies));
-		String[] nextLine_bodies_official;
-		while ((nextLine_bodies_official = reader_bodies_official.readNext()) != null) {
-			String bodyID = nextLine_bodies_official[0];
-			String article = nextLine_bodies_official[1];
-			createTheTrainDocument(bodyID, article);
+		CSVReader official_bodies = new CSVReader(new FileReader(official_test_bodies));
+		String[] official_nextLine_bodies;
+		while ((official_nextLine_bodies = official_bodies.readNext()) != null) {
+			String bodyID = official_nextLine_bodies[0];
+			String article = official_nextLine_bodies[1];
+			createTheOfficialDocument(bodyID, article);
 		}
-		reader_bodies_official.close();
+		official_bodies.close();
 		
-		// There should be 2587 articles
-		System.out.println("There are " + articles.size() + " articles");
-
-		// Read the headlines and stances of the testing data
-		CSVReader reader_stances = new CSVReader(new FileReader(path_to_train_stances));
-		String[] nextLine_stances;
-		System.out.println("Preprocessing the " + args[1] + " file");
-		while ((nextLine_stances = reader_stances.readNext()) != null) {
-			String headline = nextLine_stances[0];
-			String bodyID = nextLine_stances[1];
-			String actualStance = nextLine_stances[2];
+		/*** Use the opencsv jar for reading the csv file ***/
+		// Read the stances of the official data
+		System.out.println("Preprocessing the " + args[3] + " file");
+		CSVReader reader_stances_official = new CSVReader(new FileReader(official_test_stances));
+		String[] nextLine_stances_official;
+		while ((nextLine_stances_official = reader_stances_official.readNext()) != null) {
+			String headline = nextLine_stances_official[0];
+			String bodyID = nextLine_stances_official[1];
+			String actualStance = nextLine_stances_official[2];
 			createTheTrainHeadline(headline, bodyID, actualStance);
 		}
-		reader_stances.close();
-
-		DecimalFormat intFormat = new DecimalFormat("#");
-
-		numberOfHeadlines = trainingHeadlines.size();
-
-		preProcessForNBTraining();
+		reader_stances_official.close();
 		
-		System.out.println("Beginning Naive Bayes training on preprocessed data");
-		
-		try {
-			makeInstances();
-		} catch (Exception e1) {
-			e1.printStackTrace();
-		}
-
-		// End the timer for training, and calculate the time taken for training
-		Date enddate = new Date();
-		float trainEndTime = enddate.getTime();
-		System.out.println("Ending training at " + enddate.toString());
-		System.out.println("Time elapsed is " + (trainEndTime - trainStartTime) + " milliseconds.");
-		// if (debug) {
-		System.out.println("We had " + intFormat.format(artcount) + " articles");
-		System.out.println("We had " + intFormat.format(headcount) + " headlines");
-		// }
-
-		System.out.println("Generating an .arff file for Weka");
-		generateArffFile("test_stances_csc483583.arff");
-
-		// Begin testing on the data set, keeping track of the important metrics
-		// for performance
-		Date testStart = new Date();
-		float testStartTime = testStart.getTime();
-		System.out.println("Beginning testing at " + testStart.toString());
-
-		// Read the headlines and stances of the testing data
-		CSVReader tester_stances = new CSVReader(new FileReader(path_to_test_stances));
-		String[] tester_nextLine_stances;
-		System.out.println("Preprocessing the " + args[3] + " file");
-		while ((tester_nextLine_stances = tester_stances.readNext()) != null) {
-			String headline = tester_nextLine_stances[0];
-			String bodyID = tester_nextLine_stances[1];
-			String actualStance = tester_nextLine_stances[2];
-			createTheTestHeadline(headline, bodyID, actualStance);
-		}
-
-		tester_stances.close();
-		
-		/*
-		// Now that the training bodies and training headlines have been parsed
-		// and lemmatized, begin Naive Bayes training for the set of training
-		// data.
-		StandardAnalyzer analyzerTest = new StandardAnalyzer();
-		Directory indexTest = new RAMDirectory();
-		IndexWriterConfig configTest = new IndexWriterConfig(analyzerTest);
-		IndexWriter wTest = new IndexWriter(indexTest, configTest);
-		// Add indexing for tf-idf similarity between Headline and Document
-		for (String bodyID : articles.keySet()) {
-			addDoc(wTest, bodyID, articles.get(bodyID).getArticleString());
-		}
-		wTest.close();
-		*/
-		
-		preProcessforNBTesting();
+		preProcessforNBTesting(2);
 		
 		System.out.println("Beginning Naive Bayes testing for preprocessed data");
 		try {
-			applyClassifyingModel();
+			applyClassifyingModel(2);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-
-		// Print out the time taken to conduct testing
-		Date testEnd = new Date();
-		float testEndTime = testEnd.getTime();
-		System.out.println("Testing ended at " + testEnd.toString());
-		System.out.println("Time elapsed is " + (testEndTime - testStartTime) + " milliseconds");
 		
-		getFinalScore();
-		generateOutputCSV();
+		getFinalScore(2);
+		generateOutputCSV("phase_two_testing.csv");
 
 	}
 
@@ -330,10 +236,10 @@ public class FakeNewsChallengeMain {
 	 * training data set before a classifier is derived from the values that are
 	 * being used
 	 **/
-	public static void makeInstances() throws Exception {
+	public static void makeInstances(int phase) throws Exception {
 
 		// Declare the first Attribute, the tf_idf
-//		Attribute Attribute1 = new Attribute("tf-idf");
+		// Attribute Attribute1 = new Attribute("tf-idf");
 		// Declare second Attribute, whether it is agreeable or not
 		Attribute Attribute2 = new Attribute("agree");
 		// Declare third Attribute, whether it is disagreeable or not
@@ -355,7 +261,7 @@ public class FakeNewsChallengeMain {
 
 		// Declare the feature vector
 		ArrayList<Attribute> fvWekaAttributes = new ArrayList<Attribute>();
-//		fvWekaAttributes.add(Attribute1);
+		// fvWekaAttributes.add(Attribute1);
 		fvWekaAttributes.add(Attribute2);
 		fvWekaAttributes.add(Attribute3);
 		fvWekaAttributes.add(Attribute4);
@@ -373,7 +279,7 @@ public class FakeNewsChallengeMain {
 				if (headline.related) {
 					// Create the instance
 					Instance iExample = new DenseInstance(6);
-//					iExample.setValue((Attribute) fvWekaAttributes.get(0), headline.getTFIDF());
+					// iExample.setValue((Attribute) fvWekaAttributes.get(0), headline.getTFIDF());
 					iExample.setValue((Attribute) fvWekaAttributes.get(0), headline.agrees);
 					iExample.setValue((Attribute) fvWekaAttributes.get(1), headline.disagrees);
 					iExample.setValue((Attribute) fvWekaAttributes.get(2), headline.discusses);
@@ -398,10 +304,10 @@ public class FakeNewsChallengeMain {
 	 * The application of the Weka Naive Bayes Machine Learning algorithm, using
 	 * several distinct attributes for supervised learning
 	 **/
-	public static void applyClassifyingModel() throws Exception {
+	public static void applyClassifyingModel(int phase) throws Exception {
 
 		// Declare the first Attribute, the tf_idf
-//		Attribute Attribute1 = new Attribute("tf-idf");
+		// Attribute Attribute1 = new Attribute("tf-idf");
 		// Declare second Attribute, whether it is agreeable or not
 		Attribute Attribute2 = new Attribute("agree");
 		// Declare third Attribute, whether it is disagreeable or not
@@ -423,7 +329,7 @@ public class FakeNewsChallengeMain {
 
 		// Declare the feature vector
 		ArrayList<Attribute> fvWekaAttributes = new ArrayList<Attribute>();
-//		fvWekaAttributes.add(Attribute1);
+		// fvWekaAttributes.add(Attribute1);
 		fvWekaAttributes.add(Attribute2);
 		fvWekaAttributes.add(Attribute3);
 		fvWekaAttributes.add(Attribute4);
@@ -436,24 +342,16 @@ public class FakeNewsChallengeMain {
 		// Set class index
 		testing_set.setClassIndex(fvWekaAttributes.size() - 1);
 
-//		HashMap<Integer, Headline> mistakeMap = new HashMap<Integer, Headline>();
 		ArrayList<Headline> relatedHeadlines = new ArrayList<Headline>();
-//		ArrayList<Integer> hashcodes = new ArrayList<Integer>();
 		
-//		int counter = 0;
 		for (Headline headline : testingHeadlines) {
 			if (!headline.getBodyID().equals("Body ID")) {
 				if (headline.related) {
-//					System.out.println(counter + " : " + headline.headlineString + " | " + headline.actualStance);
-//					System.out.println();
 					// Keeping track of any mistakes made by the classifier
-//					headline.hashValue = headline.hashCode();
-//					hashcodes.add(headline.hashValue);
 					relatedHeadlines.add(headline);
-//					mistakeMap.put(headline.hashValue, headline);
 					// Create the instance
 					Instance iExample = new DenseInstance(6);
-//					iExample.setValue((Attribute) fvWekaAttributes.get(0), headline.getTFIDF());
+					// iExample.setValue((Attribute) fvWekaAttributes.get(0), headline.getTFIDF());
 					iExample.setValue((Attribute) fvWekaAttributes.get(0), headline.agrees);
 					iExample.setValue((Attribute) fvWekaAttributes.get(1), headline.disagrees);
 					iExample.setValue((Attribute) fvWekaAttributes.get(2), headline.discusses);
@@ -465,7 +363,6 @@ public class FakeNewsChallengeMain {
 					testing_set.add(iExample);
 				}
 			}
-//			counter++;
 		}
 		// Test the model
 		Evaluation eTest = new Evaluation(testing_set);
@@ -505,19 +402,6 @@ public class FakeNewsChallengeMain {
 		// Print the result à la Weka explorer:
 		String strSummary = eTest.toSummaryString();
 		System.out.println("Performance Summary " + strSummary);
-
-		// Get the confusion matrix
-//		double[][] cmMatrix = eTest.confusionMatrix();
-		
-
-		// Specify that the instance belong to the training set
-		// in order to inherit from the set description
-		// iUse.setDataset(isTrainingSet);
-
-		// Get the likelihood of each classes
-		// fDistribution[0] is the probability of being “positive”
-		// fDistribution[1] is the probability of being “negative”
-		// double[] fDistribution = cModel.distributionForInstance(iUse);
 
 	}
 
@@ -565,140 +449,250 @@ public class FakeNewsChallengeMain {
 	 * Used to preclassify any of the headlines that are determined to be 
 	 * unrelated, using the tf-idf score
 	 **/
-	public static void preProcessforNBTesting() throws IOException, ParseException {
-		// Preprocess for each headline in the list
-				for (Headline headline : testingHeadlines) {
-					// Calculate the different scores for the four classes
-					MyDocument mappedDoc = articles.get(headline.getBodyID());
-					float tf_idf = (float) 0.0;
-					StandardAnalyzer analyzer = new StandardAnalyzer();
-					Directory index = new RAMDirectory();
-					IndexWriterConfig config = new IndexWriterConfig(analyzer);
-					IndexWriter w = new IndexWriter(index, config);
-					addDoc(w, mappedDoc.getBodyIDString(), mappedDoc.getArticleString());
-					String query = "";
-					int termCounter = 0;
+	public static void preProcessforNBTesting(int phase) throws IOException, ParseException {
+		if(phase == 1) {
+			// Preprocess for each headline in the list
+			for (Headline headline : testingHeadlines) {
+				// Calculate the different scores for the four classes
+				MyDocument mappedDoc = articles.get(headline.getBodyID());
+				float tf_idf = (float) 0.0;
+				StandardAnalyzer analyzer = new StandardAnalyzer();
+				Directory index = new RAMDirectory();
+				IndexWriterConfig config = new IndexWriterConfig(analyzer);
+				IndexWriter w = new IndexWriter(index, config);
+				addDoc(w, mappedDoc.getBodyIDString(), mappedDoc.getArticleString());
+				String query = "";
+				int termCounter = 0;
 
-					headline.sentiment = mappedDoc.getBodySentiment();
+				headline.sentiment = mappedDoc.getBodySentiment();
 
-					for (String term : headline.getHeadlineStrings()) {
-						if (punctuations.contains(term)) {
-							// Do nothing, it'll break the Lucene QueryParser
-						} else {
-							if (tripWords.contains(term)) {
-								continue;
-							} else if (splitWords.contains(term)) {
-								String[] parts = term.split("-|/");
-								if (termCounter == 0) {
-								} else {
-								}
-							} else if (termCounter == 0) {
-								query += term;
-								termCounter++;
-							} else {
-								query += " AND " + term;
-								termCounter++;
-							}
-						}
-						if (discussWords.contains(term)) {
-							// Add points that signify discussion
-							headline.addDiscussPoints();
-						}
-						if (agreeWords.contains(term)) {
-							// Add points that signify agreement
-							headline.addAgreePoints();
-						}
-						if (disagreeWords.contains(term)) {
-							// Add points that signify disagreement
-							headline.addDisagreePoints();
-						}
-					}
-
-					Query q = new QueryParser("text", analyzer).parse(query);
-					int hits = 10;
-					w.close();
-					IndexReader reader = DirectoryReader.open(index);
-					IndexSearcher searcher = new IndexSearcher(reader);
-					TopDocs docs = searcher.search(q, hits);
-					ScoreDoc[] topHits = docs.scoreDocs;
-
-					if (topHits.length != 0) {
-						headline.setTFIDF(topHits[0].score);
-						headline.setRelatedness(true);
-						if (debug && printTrain) {
-							System.out.println(headline.actualStance);
-							System.out.println(headline.getHeadlineString());
-							System.out.println("tf_idf score is " + topHits[0].score + "\n");
-						}
+				for (String term : headline.getHeadlineStrings()) {
+					if (punctuations.contains(term)) {
+						// Do nothing, it'll break the Lucene QueryParser
 					} else {
-						// QueryParser tf-idf used for ML algorithms
-						headline.setTFIDF(tf_idf);
-						headline.setRelatedness(false);
-						if(headline.actualStance.equals("unrelated")) {
-							headline.correctlyClassed=true;
-							headline.setCorrectlyClassified();
-							headline.realClass=0.0F;
-							headline.predictedClass=0.0F;
-							testingResults.add(headline);
+						if (tripWords.contains(term)) {
+							continue;
+						} else if (splitWords.contains(term)) {
+							String[] parts = term.split("-|/");
+							if (termCounter == 0) {
+							} else {
+							}
+						} else if (termCounter == 0) {
+							query += term;
+							termCounter++;
+						} else {
+							query += " AND " + term;
+							termCounter++;
 						}
 					}
-
-					// Use the sentiment analysis to set the headline's sentiment
-					// If 0.0F, then neutral (discuss),
-					// if 1.0F then agree,
-					// if 2.0F then disagree
-					float headlineSentimentValue = -1.0F;
-					float bodySentiment = mappedDoc.getBodySentiment();
-					float headlineSentiment = headline.getHeadlineSentiment();
-					/*** The values returned by the sentiment getters are the same, 
-					 *** as follows:
-					 ***  float positive = 1.0F, negative = 2.0F, neutral = 3.0F ****/
-					// If the body is neutral and the headline is neutral, they discuss
-					// If the body is positive and headline is negative, they disagree -- or vice versa
-					// If the body is positive and the headline is positive they agree -- or vice versa
-					if (bodySentiment == 1.0F) { // The body is positive
-						if (headlineSentiment == 1.0F) { // The headline is positive
-							headlineSentimentValue = 1.0F; // They agree
-						} else if (headlineSentiment == 2.0F) { // The headline is negative
-							headlineSentimentValue = 2.0F; // They disagree
-						} else { // The headline is neutral
-							headlineSentimentValue = 0.0F; // No determination -- set to neutral
-						}
-					} else if (bodySentiment == 2.0F) { // The body is negative
-						if (headlineSentiment == 1.0F) { // The headline is positive
-							headlineSentimentValue = 2.0F; // The disagree
-						} else if (headlineSentiment == 2.0F) { // The headline is negative
-							headlineSentimentValue = 1.0F; // They agree
-						} else { // The headline is neutral
-							headlineSentimentValue = 0.0F; // No determination -- set to neutral
-						}
-					} else if (bodySentiment == 3.0F) { // The body is neutral
-						if (headlineSentiment == 1.0F) { // The headline is positive
-							headlineSentimentValue = 0.0F; // No determination -- set to neutral
-						} else if (headlineSentiment == 2.0F) { // The headline is negative
-							headlineSentimentValue = 0.0F; // No determination -- set to neutral
-						} else { // The headline is neutral
-							headlineSentimentValue = 0.0F; // No determination -- set to neutral
-						}
+					if (discussWords.contains(term)) {
+						// Add points that signify discussion
+						headline.addDiscussPoints();
 					}
-
-					headline.sentiment = headlineSentimentValue;
-
-					reader.close();
-
+					if (agreeWords.contains(term)) {
+						// Add points that signify agreement
+						headline.addAgreePoints();
+					}
+					if (disagreeWords.contains(term)) {
+						// Add points that signify disagreement
+						headline.addDisagreePoints();
+					}
 				}
+
+				Query q = new QueryParser("text", analyzer).parse(query);
+				int hits = 10;
+				w.close();
+				IndexReader reader = DirectoryReader.open(index);
+				IndexSearcher searcher = new IndexSearcher(reader);
+				TopDocs docs = searcher.search(q, hits);
+				ScoreDoc[] topHits = docs.scoreDocs;
+
+				if (topHits.length != 0) {
+					headline.setTFIDF(topHits[0].score);
+					headline.setRelatedness(true);
+				} else {
+					// QueryParser tf-idf used for ML algorithms
+					headline.setTFIDF(tf_idf);
+					headline.setRelatedness(false);
+					if(headline.actualStance.equals("unrelated")) {
+						headline.correctlyClassed=true;
+						headline.setCorrectlyClassified();
+						headline.realClass=0.0F;
+						headline.predictedClass=0.0F;
+						testingResults.add(headline);
+					}
+				}
+
+				// Use the sentiment analysis to set the headline's sentiment
+				// If 0.0F, then neutral (discuss),
+				// if 1.0F then agree,
+				// if 2.0F then disagree
+				float headlineSentimentValue = -1.0F;
+				float bodySentiment = mappedDoc.getBodySentiment();
+				float headlineSentiment = headline.getHeadlineSentiment();
+				/*** The values returned by the sentiment getters are the same, 
+				 *** as follows:
+				 ***  float positive = 1.0F, negative = 2.0F, neutral = 3.0F ****/
+				// If the body is neutral and the headline is neutral, they discuss
+				// If the body is positive and headline is negative, they disagree -- or vice versa
+				// If the body is positive and the headline is positive they agree -- or vice versa
+				if (bodySentiment == 1.0F) { // The body is positive
+					if (headlineSentiment == 1.0F) { // The headline is positive
+						headlineSentimentValue = 1.0F; // They agree
+					} else if (headlineSentiment == 2.0F) { // The headline is negative
+						headlineSentimentValue = 2.0F; // They disagree
+					} else { // The headline is neutral
+						headlineSentimentValue = 0.0F; // No determination -- set to neutral
+					}
+				} else if (bodySentiment == 2.0F) { // The body is negative
+					if (headlineSentiment == 1.0F) { // The headline is positive
+						headlineSentimentValue = 2.0F; // The disagree
+					} else if (headlineSentiment == 2.0F) { // The headline is negative
+						headlineSentimentValue = 1.0F; // They agree
+					} else { // The headline is neutral
+						headlineSentimentValue = 0.0F; // No determination -- set to neutral
+					}
+				} else if (bodySentiment == 3.0F) { // The body is neutral
+					if (headlineSentiment == 1.0F) { // The headline is positive
+						headlineSentimentValue = 0.0F; // No determination -- set to neutral
+					} else if (headlineSentiment == 2.0F) { // The headline is negative
+						headlineSentimentValue = 0.0F; // No determination -- set to neutral
+					} else { // The headline is neutral
+						headlineSentimentValue = 0.0F; // No determination -- set to neutral
+					}
+				}
+
+				headline.sentiment = headlineSentimentValue;
+
+				reader.close();
+
+			}
+		} else {
+			// Preprocess for each headline in the list
+			for (Headline headline : officialHeadlines) {
+				// Calculate the different scores for the four classes
+				MyDocument mappedDoc = officialArticles.get(headline.getBodyID());
+				float tf_idf = (float) 0.0;
+				StandardAnalyzer analyzer = new StandardAnalyzer();
+				Directory index = new RAMDirectory();
+				IndexWriterConfig config = new IndexWriterConfig(analyzer);
+				IndexWriter w = new IndexWriter(index, config);
+				addDoc(w, mappedDoc.getBodyIDString(), mappedDoc.getArticleString());
+				String query = "";
+				int termCounter = 0;
+
+				headline.sentiment = mappedDoc.getBodySentiment();
+
+				for (String term : headline.getHeadlineStrings()) {
+					if (punctuations.contains(term)) {
+						// Do nothing, it'll break the Lucene QueryParser
+					} else {
+						if (tripWords.contains(term)) {
+							continue;
+						} else if (splitWords.contains(term)) {
+							String[] parts = term.split("-|/");
+							if (termCounter == 0) {
+							} else {
+							}
+						} else if (termCounter == 0) {
+							query += term;
+							termCounter++;
+						} else {
+							query += " AND " + term;
+							termCounter++;
+						}
+					}
+					if (discussWords.contains(term)) {
+						// Add points that signify discussion
+						headline.addDiscussPoints();
+					}
+					if (agreeWords.contains(term)) {
+						// Add points that signify agreement
+						headline.addAgreePoints();
+					}
+					if (disagreeWords.contains(term)) {
+						// Add points that signify disagreement
+						headline.addDisagreePoints();
+					}
+				}
+
+				Query q = new QueryParser("text", analyzer).parse(query);
+				int hits = 10;
+				w.close();
+				IndexReader reader = DirectoryReader.open(index);
+				IndexSearcher searcher = new IndexSearcher(reader);
+				TopDocs docs = searcher.search(q, hits);
+				ScoreDoc[] topHits = docs.scoreDocs;
+
+				if (topHits.length != 0) {
+					headline.setTFIDF(topHits[0].score);
+					headline.setRelatedness(true);
+				} else {
+					// QueryParser tf-idf used for ML algorithms
+					headline.setTFIDF(tf_idf);
+					headline.setRelatedness(false);
+					if(headline.actualStance.equals("unrelated")) {
+						headline.correctlyClassed=true;
+						headline.setCorrectlyClassified();
+						headline.realClass=0.0F;
+						headline.predictedClass=0.0F;
+						officialResults.add(headline);
+					}
+				}
+
+				// Use the sentiment analysis to set the headline's sentiment
+				// If 0.0F, then neutral (discuss),
+				// if 1.0F then agree,
+				// if 2.0F then disagree
+				float headlineSentimentValue = -1.0F;
+				float bodySentiment = mappedDoc.getBodySentiment();
+				float headlineSentiment = headline.getHeadlineSentiment();
+				/*** The values returned by the sentiment getters are the same, 
+				 *** as follows:
+				 ***  float positive = 1.0F, negative = 2.0F, neutral = 3.0F ****/
+				// If the body is neutral and the headline is neutral, they discuss
+				// If the body is positive and headline is negative, they disagree -- or vice versa
+				// If the body is positive and the headline is positive they agree -- or vice versa
+				if (bodySentiment == 1.0F) { // The body is positive
+					if (headlineSentiment == 1.0F) { // The headline is positive
+						headlineSentimentValue = 1.0F; // They agree
+					} else if (headlineSentiment == 2.0F) { // The headline is negative
+						headlineSentimentValue = 2.0F; // They disagree
+					} else { // The headline is neutral
+						headlineSentimentValue = 0.0F; // No determination -- set to neutral
+					}
+				} else if (bodySentiment == 2.0F) { // The body is negative
+					if (headlineSentiment == 1.0F) { // The headline is positive
+						headlineSentimentValue = 2.0F; // The disagree
+					} else if (headlineSentiment == 2.0F) { // The headline is negative
+						headlineSentimentValue = 1.0F; // They agree
+					} else { // The headline is neutral
+						headlineSentimentValue = 0.0F; // No determination -- set to neutral
+					}
+				} else if (bodySentiment == 3.0F) { // The body is neutral
+					if (headlineSentiment == 1.0F) { // The headline is positive
+						headlineSentimentValue = 0.0F; // No determination -- set to neutral
+					} else if (headlineSentiment == 2.0F) { // The headline is negative
+						headlineSentimentValue = 0.0F; // No determination -- set to neutral
+					} else { // The headline is neutral
+						headlineSentimentValue = 0.0F; // No determination -- set to neutral
+					}
+				}
+
+				headline.sentiment = headlineSentimentValue;
+
+				reader.close();
+
+			}
+		}
+		
 	}
 
 	/**
 	 * Used to determine the values of the selected features which will be used
 	 * in the classifying model
 	 **/
-	public static void preProcessForNBTraining() throws IOException, ParseException {
-
-		if (debug) {
-			// Debug print statement
-			System.out.println("In Naive Bayes training");
-		}
+	public static void preProcessForNBTraining(int phase) throws IOException, ParseException {
 
 		// Preprocess for each headline in the list
 		for (Headline headline : trainingHeadlines) {
@@ -759,11 +753,6 @@ public class FakeNewsChallengeMain {
 			if (topHits.length != 0) {
 				headline.setTFIDF(topHits[0].score);
 				headline.setRelatedness(true);
-				if (debug && printTrain) {
-					System.out.println(headline.actualStance);
-					System.out.println(headline.getHeadlineString());
-					System.out.println("tf_idf score is " + topHits[0].score + "\n");
-				}
 			} else {
 				// QueryParser tf-idf used for ML algorithms
 				headline.setTFIDF(tf_idf);
@@ -838,6 +827,22 @@ public class FakeNewsChallengeMain {
 			}	
 		}
 	}
+	public static void createTheOfficialDocument(String bodyID, String theArticle) {
+		theArticle = theArticle.replaceAll("\\r\\n|\\r|\\n", " ");
+		MyDocument d = null;
+		if(!bodyID.equals("Body ID")) {
+			if (officialArticles.containsKey(bodyID)) {
+				d = (MyDocument) officialArticles.get(bodyID);
+			} else {
+				d = new MyDocument(theArticle, bodyID);
+				officialArticles.put(bodyID, d);
+			}	
+		}
+	}
+	public static void createTheOfficialHeadline(String headline, String bodyID, String actualStance) {
+		Headline h = new Headline(headline, bodyID, actualStance);
+		officialHeadlines.add(h);
+	}
 
 	/**
 	 * Called to create a headline for the training headlines List of headlines
@@ -875,7 +880,7 @@ public class FakeNewsChallengeMain {
 	 * Print out the scoring as it relates to the weighting method specified on
 	 * the project web site
 	 */
-	public static void getFinalScore() {
+	public static void getFinalScore(int phase) {
 		
 		int[][] confusionMatrix = new int[4][4];
 		float correct = 0.0F, incorrect = 0.0F;
@@ -904,7 +909,7 @@ public class FakeNewsChallengeMain {
 	 */
 	public static void generateOutputCSV(String filename) throws IOException {
 		
-//		CSVWriter writer = new CSVWriter(new FileWriter("test_results.csv"), '\t');
+		// CSVWriter writer = new CSVWriter(new FileWriter("test_results.csv"), '\t');
 		CSVWriter writer = new CSVWriter(new FileWriter(filename), ',');
 		// feed in your array (or convert your data to an array)
 		System.out.println("Size of the testing results is " + testingResults.size());
@@ -1210,9 +1215,6 @@ public class FakeNewsChallengeMain {
 				break;
 			}
 
-			if (debug && headlinePrint) {
-				System.out.println("Headline of " + theHeadline + "\n");
-			}
 			headcount++;
 			Scanner stringScan = new Scanner(headlineString);
 
