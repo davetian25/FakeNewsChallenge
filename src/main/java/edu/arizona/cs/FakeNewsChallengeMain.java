@@ -2,9 +2,14 @@ package edu.arizona.cs;
 
 //Standard Java imports for File I/O and utilities
 import java.io.BufferedWriter;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -150,6 +155,7 @@ public class FakeNewsChallengeMain {
 
 		DecimalFormat intFormat = new DecimalFormat("#");
 
+		/*
 		// Now that the training bodies and training headlines have been parsed
 		// and lemmatized, begin Naive Bayes training for the set of training
 		// data.
@@ -161,17 +167,23 @@ public class FakeNewsChallengeMain {
 		for (String bodyID : articles.keySet()) {
 			addDoc(w, bodyID, articles.get(bodyID).getArticleString());
 		}
+		w.close();
+		*/
 
 		numberOfHeadlines = headlines.size();
 
 		preProcessForNBTraining();
 		
 		System.out.println("Beginning Naive Bayes training on preprocessed data");
-		try {
-			makeInstances();
-		} catch (Exception e1) {
-			e1.printStackTrace();
-		}
+		try {// Comment out if not working
+			loadPersistentClassifier();// Comment out if not working
+		} catch (ClassNotFoundException e) {// Comment out if not working
+			try {
+				makeInstances();
+			} catch (Exception e1) {
+				e1.printStackTrace();
+			}
+		}// Comment out if not working
 
 		// End the timer for training, and calculate the time taken for training
 		Date enddate = new Date();
@@ -185,6 +197,7 @@ public class FakeNewsChallengeMain {
 
 		System.out.println("Generating an .arff file for Weka");
 		generateArffFile("test_stances_csc483583.arff");
+		makePersistentClassifier();
 
 		// Begin testing on the data set, keeping track of the important metrics
 		// for performance
@@ -205,6 +218,21 @@ public class FakeNewsChallengeMain {
 
 		tester_stances.close();
 		
+		/*
+		// Now that the training bodies and training headlines have been parsed
+		// and lemmatized, begin Naive Bayes training for the set of training
+		// data.
+		StandardAnalyzer analyzerTest = new StandardAnalyzer();
+		Directory indexTest = new RAMDirectory();
+		IndexWriterConfig configTest = new IndexWriterConfig(analyzerTest);
+		IndexWriter wTest = new IndexWriter(indexTest, configTest);
+		// Add indexing for tf-idf similarity between Headline and Document
+		for (String bodyID : articles.keySet()) {
+			addDoc(wTest, bodyID, articles.get(bodyID).getArticleString());
+		}
+		wTest.close();
+		*/
+		
 		preProcessforNBTesting();
 		
 		System.out.println("Beginning Naive Bayes testing for preprocessed data");
@@ -220,9 +248,24 @@ public class FakeNewsChallengeMain {
 		System.out.println("Testing ended at " + testEnd.toString());
 		System.out.println("Time elapsed is " + (testEndTime - testStartTime) + " milliseconds");
 		
-		generateOutputCSV();
 		getFinalScore();
+		generateOutputCSV();
 
+	}
+
+	public static void makePersistentClassifier() throws FileNotFoundException, IOException {
+		 // serialize model
+		 ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream("/NB.model"));
+		 oos.writeObject(cModel);
+		 oos.flush();
+		 oos.close();
+	}
+	
+	public static void loadPersistentClassifier() throws IOException, ClassNotFoundException {
+		 // deserialize model
+		 ObjectInputStream ois = new ObjectInputStream(new FileInputStream("/NB.model"));
+		 cModel = (Classifier) ois.readObject();
+		 ois.close();
 	}
 
 	/**
@@ -247,7 +290,7 @@ public class FakeNewsChallengeMain {
 
 		// Declare the class attribute along with its values
 		ArrayList<String> fvClassVal = new ArrayList<String>();
-		// fvClassVal.add("unrelated");
+		fvClassVal.add("unrelated");
 		fvClassVal.add("agree");
 		fvClassVal.add("disagree");
 		fvClassVal.add("discuss");
@@ -289,6 +332,7 @@ public class FakeNewsChallengeMain {
 		// Create a naïve bayes classifier
 		cModel = (Classifier) new NaiveBayes();
 		cModel.buildClassifier(training_set);
+		System.out.println("The model is:");
 		System.out.println(cModel);
 
 	}
@@ -314,7 +358,7 @@ public class FakeNewsChallengeMain {
 
 		// Declare the class attribute along with its values
 		ArrayList<String> fvClassVal = new ArrayList<String>();
-		// fvClassVal.add("unrelated");
+		fvClassVal.add("unrelated");
 		fvClassVal.add("agree");
 		fvClassVal.add("disagree");
 		fvClassVal.add("discuss");
@@ -335,7 +379,8 @@ public class FakeNewsChallengeMain {
 		// Set class index
 		testing_set.setClassIndex(fvWekaAttributes.size() - 1);
 
-		HashMap<Integer, Headline> mistakeMap = new HashMap<Integer, Headline>();
+//		HashMap<Integer, Headline> mistakeMap = new HashMap<Integer, Headline>();
+		ArrayList<Headline> relatedHeadlines = new ArrayList<Headline>();
 		ArrayList<Integer> hashcodes = new ArrayList<Integer>();
 		
 		int counter = 0;
@@ -347,7 +392,8 @@ public class FakeNewsChallengeMain {
 					// Keeping track of any mistakes made by the classifier
 					headline.hashValue = headline.hashCode();
 					hashcodes.add(headline.hashValue);
-					mistakeMap.put(headline.hashValue, headline);
+					relatedHeadlines.add(headline);
+//					mistakeMap.put(headline.hashValue, headline);
 					// Create the instance
 					Instance iExample = new DenseInstance(6);
 //					iExample.setValue((Attribute) fvWekaAttributes.get(0), headline.getTFIDF());
@@ -379,17 +425,21 @@ public class FakeNewsChallengeMain {
 //			 System.out.println(predict.toString());
 			 if (predict.predicted() == predict.actual()) {
 				 int index = hashcodes.get(predictionCounter);
-				 Headline correctHeadline = mistakeMap.get(index);
+				 Headline correctHeadline = relatedHeadlines.get(index);
+//				 Headline correctHeadline = mistakeMap.get(index);
 				 System.out.println("Correctly classified:");
 				 System.out.println(correctHeadline.headlineString);
 				 System.out.println(predict.toString());
 				 System.out.println(predict.predicted() + " and was " + predict.actual()); //TODO Look here!
+				 System.out.println("If this is working, the actual stance is " + correctHeadline.actualStance);
 				 System.out.println();
 				 correctHeadline.correctlyClassed=true;
+				 correctHeadline.setCorrectlyClassified();
 			 } else {
 				 int index = hashcodes.get(predictionCounter);
-				 Headline correctHeadline = mistakeMap.get(index);
-				 System.out.println("Correctly classified:");
+				 Headline correctHeadline = relatedHeadlines.get(index);
+//				 Headline correctHeadline = mistakeMap.get(index);
+				 System.out.println("Incorrectly classified:");
 				 System.out.println(correctHeadline.headlineString);
 				 System.out.println(predict.toString());
 				 System.out.println(predict.predicted() + " and was " + predict.actual()); //TODO Look here!
@@ -535,6 +585,7 @@ public class FakeNewsChallengeMain {
 						headline.setRelatedness(false);
 						if(headline.actualStance.equals("unrelated")) {
 							headline.correctlyClassed=true;
+							headline.setCorrectlyClassified();
 						}
 					}
 
@@ -665,6 +716,7 @@ public class FakeNewsChallengeMain {
 				headline.setRelatedness(false);
 				if(headline.actualStance.equals("unrelated")) {
 					headline.correctlyClassed=true;
+					headline.setCorrectlyClassified();
 				}
 			}
 
@@ -770,6 +822,16 @@ public class FakeNewsChallengeMain {
 		
 		int[][] confusionMatrix;
 		//TODO
+		int correct = 0, incorrect = 0;
+		for(Headline headline:testingHeadlines) {
+			if(headline.correctlyClassed) {
+				correct++;
+			} else {
+				incorrect++;
+			}
+		}
+		System.out.println("Correct percentage was " + correct/testingHeadlines.size());
+		System.out.println("Incorrect percentage was " + incorrect/testingHeadlines.size());
 
 	}
 	
@@ -783,9 +845,15 @@ public class FakeNewsChallengeMain {
 		
 		CSVWriter writer = new CSVWriter(new FileWriter("yourfile.csv"), '\t');
 		// feed in your array (or convert your data to an array)
+		System.out.println("Size of the testing results is " + testingHeadlines.size());
 		for(Headline headline:testingHeadlines) {
-			String[] entries = (headline.headlineString+"#"+headline.bodyID+"#"+headline.getPredictedStance()).split("#");
-			System.out.println(entries[0]+ " : " + entries[1] + " : " + entries[2]);
+//			String[] entries = (headline.headlineString+"#"+headline.bodyID+"#"+headline.getPredictedStance()).split("#");
+			String[] entries = new String[3];
+			entries[0]=headline.headlineString;
+			entries[1]=headline.bodyID;
+			entries[2]=headline.getPredictedStance();
+			System.out.println(entries.length);
+			System.out.println(entries[0]+ " : " + entries[1] + " : ");// + entries[2]);
 			writer.writeNext(entries);
 		}
 		writer.close();
@@ -855,11 +923,8 @@ public class FakeNewsChallengeMain {
 			}
 
 			articleScanner.close();
-
 			artcount++;
-			
 			Scanner stringScan = new Scanner(articleString);
-
 			while (stringScan.hasNext()) {
 				String word = stringScan.next();
 				if (agreeWords.contains(word)) {
@@ -1148,6 +1213,11 @@ public class FakeNewsChallengeMain {
 			String returnVal = "";
 			//TODO make the return of this a String of the predicted type
 			// i.e. turn a numeric value into a string
+			if(this.correctlyClassed) {
+				returnVal=this.actualStance;
+			} else {
+				returnVal="wrongClass";
+			}
 			return returnVal;
 		}
 
@@ -1158,6 +1228,10 @@ public class FakeNewsChallengeMain {
 		public float isPositive() {
 			// TODO make this return a meaningful number
 			return 0.0F;
+		}
+		
+		public void setCorrectlyClassified() {
+			this.correctlyClassed = true;
 		}
 
 		/*
