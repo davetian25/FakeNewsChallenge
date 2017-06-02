@@ -78,6 +78,8 @@ public class FakeNewsChallengeMain {
 	static List<Headline> headlines = new ArrayList<Headline>();
 	// List of all the headlines in the testing set
 	static List<Headline> testingHeadlines = new ArrayList<Headline>();
+	
+	static List<Headline> testingResults = new ArrayList<Headline>();
 
 	/** The counters for prior probabilities **/
 	static float headcount = 0;
@@ -381,17 +383,17 @@ public class FakeNewsChallengeMain {
 
 //		HashMap<Integer, Headline> mistakeMap = new HashMap<Integer, Headline>();
 		ArrayList<Headline> relatedHeadlines = new ArrayList<Headline>();
-		ArrayList<Integer> hashcodes = new ArrayList<Integer>();
+//		ArrayList<Integer> hashcodes = new ArrayList<Integer>();
 		
-		int counter = 0;
+//		int counter = 0;
 		for (Headline headline : testingHeadlines) {
 			if (!headline.getBodyID().equals("Body ID")) {
 				if (headline.related) {
-					System.out.println(counter + " : " + headline.headlineString + " | " + headline.actualStance);
-					System.out.println();
+//					System.out.println(counter + " : " + headline.headlineString + " | " + headline.actualStance);
+//					System.out.println();
 					// Keeping track of any mistakes made by the classifier
-					headline.hashValue = headline.hashCode();
-					hashcodes.add(headline.hashValue);
+//					headline.hashValue = headline.hashCode();
+//					hashcodes.add(headline.hashValue);
 					relatedHeadlines.add(headline);
 //					mistakeMap.put(headline.hashValue, headline);
 					// Create the instance
@@ -408,42 +410,36 @@ public class FakeNewsChallengeMain {
 					testing_set.add(iExample);
 				}
 			}
-			counter++;
+//			counter++;
 		}
 		// Test the model
 		Evaluation eTest = new Evaluation(testing_set);
 		eTest.evaluateModel(cModel, testing_set);
 		
-		
-		// TODO Work on developing a viable output in proper format
-		
 		 ArrayList<Prediction> Predictions = eTest.predictions();
 		 int predictionCounter = 0;
-//		 int predictionSize = Predictions.size();
-//		 System.out.println("Number of predicitons is " + Predictions.size());
 		 for (Prediction predict : Predictions) {
-//			 System.out.println(predict.toString());
 			 if (predict.predicted() == predict.actual()) {
-				 int index = hashcodes.get(predictionCounter);
-				 Headline correctHeadline = relatedHeadlines.get(index);
-//				 Headline correctHeadline = mistakeMap.get(index);
+				 Headline correctHeadline = relatedHeadlines.get(predictionCounter);
 				 System.out.println("Correctly classified:");
 				 System.out.println(correctHeadline.headlineString);
 				 System.out.println(predict.toString());
-				 System.out.println(predict.predicted() + " and was " + predict.actual()); //TODO Look here!
+				 System.out.println(predict.predicted() + " and was " + predict.actual());
 				 System.out.println("If this is working, the actual stance is " + correctHeadline.actualStance);
 				 System.out.println();
 				 correctHeadline.correctlyClassed=true;
 				 correctHeadline.setCorrectlyClassified();
+				 correctHeadline.predictedClass = predict.predicted();
+				 testingResults.add(correctHeadline);
 			 } else {
-				 int index = hashcodes.get(predictionCounter);
-				 Headline correctHeadline = relatedHeadlines.get(index);
-//				 Headline correctHeadline = mistakeMap.get(index);
+				 Headline correctHeadline = relatedHeadlines.get(predictionCounter);
 				 System.out.println("Incorrectly classified:");
 				 System.out.println(correctHeadline.headlineString);
 				 System.out.println(predict.toString());
-				 System.out.println(predict.predicted() + " and was " + predict.actual()); //TODO Look here!
+				 System.out.println(predict.predicted() + " and was " + predict.actual());
 				 System.out.println();
+				 correctHeadline.predictedClass = predict.predicted();
+				 testingResults.add(correctHeadline);
 			 }
 			 predictionCounter++;
 		 }
@@ -586,6 +582,9 @@ public class FakeNewsChallengeMain {
 						if(headline.actualStance.equals("unrelated")) {
 							headline.correctlyClassed=true;
 							headline.setCorrectlyClassified();
+							headline.realClass=0.0F;
+							headline.predictedClass=0.0F;
+							testingResults.add(headline);
 						}
 					}
 
@@ -821,17 +820,16 @@ public class FakeNewsChallengeMain {
 	public static void getFinalScore() {
 		
 		int[][] confusionMatrix;
-		//TODO
 		float correct = 0.0F, incorrect = 0.0F;
-		for(Headline headline:testingHeadlines) {
+		for(Headline headline:testingResults) {
 			if(headline.correctlyClassed) {
 				correct++;
 			} else {
 				incorrect++;
 			}
 		}
-		System.out.println("Correct percentage was " + (float)correct/testingHeadlines.size());
-		System.out.println("Incorrect percentage was " + (float)incorrect/testingHeadlines.size());
+		System.out.println("Correct percentage was " + (float)correct/testingResults.size());
+		System.out.println("Incorrect percentage was " + (float)incorrect/testingResults.size());
 
 	}
 	
@@ -841,19 +839,15 @@ public class FakeNewsChallengeMain {
 	 * "headline", "bodyID", "predicted stance", "classification score"
 	 */
 	public static void generateOutputCSV() throws IOException {
-		//TODO
 		
 		CSVWriter writer = new CSVWriter(new FileWriter("yourfile.csv"), '\t');
 		// feed in your array (or convert your data to an array)
-		System.out.println("Size of the testing results is " + testingHeadlines.size());
-		for(Headline headline:testingHeadlines) {
-//			String[] entries = (headline.headlineString+"#"+headline.bodyID+"#"+headline.getPredictedStance()).split("#");
+		System.out.println("Size of the testing results is " + testingResults.size());
+		for(Headline headline : testingResults) {
 			String[] entries = new String[3];
 			entries[0]=headline.originalHeadline;
 			entries[1]=headline.bodyID;
 			entries[2]=headline.getPredictedStance();
-//			System.out.println(entries.length);
-//			System.out.println(entries[0]+ " : " + entries[1] + " : ");// + entries[2]);
 			writer.writeNext(entries);
 		}
 		writer.close();
@@ -1042,7 +1036,7 @@ public class FakeNewsChallengeMain {
 		public int hashValue;
 		boolean correctlyClassed = false;
 		float realClass;
-		float predictedClass;
+		double predictedClass;
 
 		// The four individual scores that the document gets assigned
 		// according to the headlines it is being checked against.
@@ -1084,7 +1078,16 @@ public class FakeNewsChallengeMain {
 		 */
 		public Headline(String headline, String bodyID, String stance) {
 			
-			//TODO make the realClass variable here!!
+			if(stance.equals("unrelated")) {
+				this.realClass=0.0F;
+			} else if(stance.equals("agree")) {
+				this.realClass=1.0F;
+			} else if(stance.equals("disagree")) {
+				this.realClass=2.0F;
+			} else {
+				this.realClass=3.0F;
+			}
+			
 			originalHeadline = headline;
 
 			Scanner headlineScanner = new Scanner(headline);
