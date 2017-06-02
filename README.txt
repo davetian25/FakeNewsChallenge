@@ -1,5 +1,5 @@
 Programmer: Daniel Avetian
-Assignment: CSC 583 HW4NB
+Assignment: CSC 583 Final Project
 Directions:
 	This program is executed from the command line. In order to compile, from the main directory folder (Final Project)
 	the user must type "mvn compile" and in order to run, they must type "mvn exec:java". The program then runs 
