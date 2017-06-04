@@ -89,9 +89,9 @@ public class FakeNewsChallengeMain {
 	static List<String> discussWords = Arrays.asList("alleged", "allegedly", "reportedly", "claiming", "claims",
 			"claim", "investigate", "may", "could", "explain", "appear", "speculation", "checks", "is");
 	// List of words that trip up the Lucene QueryParser
-	static List<String> tripWords = Arrays.asList("-lrb-", "-rrb-", "NOT", "???", "!?", "--", "``");
+	static List<String> tripWords = Arrays.asList("-lrb-", "-rrb-", "NOT", "???", "!?", "--", "``", "??");
 	// List of words that are to be split because of lexical issues
-	static List<String> splitWords = Arrays.asList("9/11-style", "15/month", "9/11", "Code/Red");
+	static List<String> splitWords = Arrays.asList("9/11-style", "15/month", "9/11", "Code/Red", "PCs/printers", "pcs/printers", "PC/printer", "pc/printer");
 	// List of words with a generally positive connotation
 	static List<String> posWords = Arrays.asList("confirms", "confirm", "born");
 	// List of words with a generally negative connotation
@@ -103,6 +103,8 @@ public class FakeNewsChallengeMain {
 	static Instances training_set;
 	// The collection of Instances belonging to the testing set
 	static Instances testing_set;
+	// The collection of Instances belonging to the official testing set
+	static Instances official_set;
 	// The classification model, specified as Naive Bayes
 	static Classifier cModel;
 
@@ -179,7 +181,7 @@ public class FakeNewsChallengeMain {
 		}
 		
 		System.out.println("Generating the output file from phase one, and computing the performance score");
-		generateOutputCSV("phase_one_testing.csv");
+		generateOutputCSV("phase_one_testing.csv", 1);
 		getFinalScore(1);
 		
 
@@ -212,8 +214,7 @@ public class FakeNewsChallengeMain {
 		while ((nextLine_stances_official = reader_stances_official.readNext()) != null) {
 			String headline = nextLine_stances_official[0];
 			String bodyID = nextLine_stances_official[1];
-			String actualStance = nextLine_stances_official[2];
-			createTheTrainHeadline(headline, bodyID, actualStance);
+			createTheOfficialHeadline(headline, bodyID);
 		}
 		reader_stances_official.close();
 		
@@ -227,7 +228,7 @@ public class FakeNewsChallengeMain {
 		}
 		
 		getFinalScore(2);
-		generateOutputCSV("phase_two_testing.csv");
+		generateOutputCSV("phase_two_testing.csv", 2);
 
 	}
 
@@ -306,102 +307,202 @@ public class FakeNewsChallengeMain {
 	 **/
 	public static void applyClassifyingModel(int phase) throws Exception {
 
-		// Declare the first Attribute, the tf_idf
-		// Attribute Attribute1 = new Attribute("tf-idf");
-		// Declare second Attribute, whether it is agreeable or not
-		Attribute Attribute2 = new Attribute("agree");
-		// Declare third Attribute, whether it is disagreeable or not
-		Attribute Attribute3 = new Attribute("disagree");
-		// Declare fourth Attribute, whether it is discussive or not
-		Attribute Attribute4 = new Attribute("discuss");
-		// Declare fifth Attribute, whether the sentiment is positive or not
-		Attribute Attribute5 = new Attribute("positive");
-		// Declare sixth attribute, sentiment analysis
-		Attribute Attribute6 = new Attribute("sentiment");
+		if(phase == 1) {
+			// Declare the first Attribute, the tf_idf
+			// Attribute Attribute1 = new Attribute("tf-idf");
+			// Declare second Attribute, whether it is agreeable or not
+			Attribute Attribute2 = new Attribute("agree");
+			// Declare third Attribute, whether it is disagreeable or not
+			Attribute Attribute3 = new Attribute("disagree");
+			// Declare fourth Attribute, whether it is discussive or not
+			Attribute Attribute4 = new Attribute("discuss");
+			// Declare fifth Attribute, whether the sentiment is positive or not
+			Attribute Attribute5 = new Attribute("positive");
+			// Declare sixth attribute, sentiment analysis
+			Attribute Attribute6 = new Attribute("sentiment");
 
-		// Declare the class attribute along with its values
-		ArrayList<String> fvClassVal = new ArrayList<String>();
-		fvClassVal.add("unrelated");
-		fvClassVal.add("agree");
-		fvClassVal.add("disagree");
-		fvClassVal.add("discuss");
-		Attribute ClassAttribute = new Attribute("the_class", fvClassVal);
+			// Declare the class attribute along with its values
+			ArrayList<String> fvClassVal = new ArrayList<String>();
+			fvClassVal.add("unrelated");
+			fvClassVal.add("agree");
+			fvClassVal.add("disagree");
+			fvClassVal.add("discuss");
+			Attribute ClassAttribute = new Attribute("the_class", fvClassVal);
 
-		// Declare the feature vector
-		ArrayList<Attribute> fvWekaAttributes = new ArrayList<Attribute>();
-		// fvWekaAttributes.add(Attribute1);
-		fvWekaAttributes.add(Attribute2);
-		fvWekaAttributes.add(Attribute3);
-		fvWekaAttributes.add(Attribute4);
-		fvWekaAttributes.add(Attribute5);
-		fvWekaAttributes.add(Attribute6);
-		fvWekaAttributes.add(ClassAttribute);
+			// Declare the feature vector
+			ArrayList<Attribute> fvWekaAttributes = new ArrayList<Attribute>();
+			// fvWekaAttributes.add(Attribute1);
+			fvWekaAttributes.add(Attribute2);
+			fvWekaAttributes.add(Attribute3);
+			fvWekaAttributes.add(Attribute4);
+			fvWekaAttributes.add(Attribute5);
+			fvWekaAttributes.add(Attribute6);
+			fvWekaAttributes.add(ClassAttribute);
 
-		// Create an empty training set
-		testing_set = new Instances("Train Data", fvWekaAttributes, 10000);
-		// Set class index
-		testing_set.setClassIndex(fvWekaAttributes.size() - 1);
+			// Create an empty training set
+			testing_set = new Instances("Train Data", fvWekaAttributes, 10000);
+			// Set class index
+			testing_set.setClassIndex(fvWekaAttributes.size() - 1);
 
-		ArrayList<Headline> relatedHeadlines = new ArrayList<Headline>();
-		
-		for (Headline headline : testingHeadlines) {
-			if (!headline.getBodyID().equals("Body ID")) {
-				if (headline.related) {
-					// Keeping track of any mistakes made by the classifier
-					relatedHeadlines.add(headline);
-					// Create the instance
-					Instance iExample = new DenseInstance(6);
-					// iExample.setValue((Attribute) fvWekaAttributes.get(0), headline.getTFIDF());
-					iExample.setValue((Attribute) fvWekaAttributes.get(0), headline.agrees);
-					iExample.setValue((Attribute) fvWekaAttributes.get(1), headline.disagrees);
-					iExample.setValue((Attribute) fvWekaAttributes.get(2), headline.discusses);
-					iExample.setValue((Attribute) fvWekaAttributes.get(3), headline.isPositive());
-					iExample.setValue((Attribute) fvWekaAttributes.get(4), headline.sentiment);
-					String headlineStance = headline.actualStance;
-					iExample.setValue((Attribute) fvWekaAttributes.get(5), headlineStance);
-					// add the instance
-					testing_set.add(iExample);
+			ArrayList<Headline> relatedHeadlines = new ArrayList<Headline>();
+			
+			for (Headline headline : testingHeadlines) {
+				if (!headline.getBodyID().equals("Body ID")) {
+					if (headline.related) {
+						// Keeping track of any mistakes made by the classifier
+						relatedHeadlines.add(headline);
+						// Create the instance
+						Instance iExample = new DenseInstance(6);
+						// iExample.setValue((Attribute) fvWekaAttributes.get(0), headline.getTFIDF());
+						iExample.setValue((Attribute) fvWekaAttributes.get(0), headline.agrees);
+						iExample.setValue((Attribute) fvWekaAttributes.get(1), headline.disagrees);
+						iExample.setValue((Attribute) fvWekaAttributes.get(2), headline.discusses);
+						iExample.setValue((Attribute) fvWekaAttributes.get(3), headline.isPositive());
+						iExample.setValue((Attribute) fvWekaAttributes.get(4), headline.sentiment);
+						String headlineStance = headline.actualStance;
+						iExample.setValue((Attribute) fvWekaAttributes.get(5), headlineStance);
+						// add the instance
+						testing_set.add(iExample);
+					}
 				}
 			}
-		}
-		// Test the model
-		Evaluation eTest = new Evaluation(testing_set);
-		eTest.evaluateModel(cModel, testing_set);
-		
-		 ArrayList<Prediction> Predictions = eTest.predictions();
-		 int predictionCounter = 0;
-		 for (Prediction predict : Predictions) {
-			 if (predict.predicted() == predict.actual()) {
-				 Headline correctHeadline = relatedHeadlines.get(predictionCounter);
-				 System.out.println("Correctly classified:");
-				 System.out.println(correctHeadline.headlineString);
-				 System.out.println(predict.toString());
-				 System.out.println(predict.predicted() + " and was " + predict.actual());
-				 System.out.println("If this is working, the actual stance is " + correctHeadline.actualStance);
-				 System.out.println();
-				 correctHeadline.correctlyClassed=true;
-				 correctHeadline.setCorrectlyClassified();
-				 correctHeadline.predictedClass = predict.predicted();
-				 testingResults.add(correctHeadline);
-			 } else {
-				 Headline correctHeadline = relatedHeadlines.get(predictionCounter);
-				 System.out.println("Incorrectly classified:");
-				 System.out.println(correctHeadline.headlineString);
-				 System.out.println(predict.toString());
-				 System.out.println(predict.predicted() + " and was " + predict.actual());
-				 System.out.println();
-				 correctHeadline.predictedClass = predict.predicted();
-				 testingResults.add(correctHeadline);
+			// Test the model
+			Evaluation eTest = new Evaluation(testing_set);
+			eTest.evaluateModel(cModel, testing_set);
+			
+			 ArrayList<Prediction> Predictions = eTest.predictions();
+			 int predictionCounter = 0;
+			 for (Prediction predict : Predictions) {
+				 if (predict.predicted() == predict.actual()) {
+					 Headline correctHeadline = relatedHeadlines.get(predictionCounter);
+					 System.out.println("Correctly classified:");
+					 System.out.println(correctHeadline.headlineString);
+					 System.out.println(predict.toString());
+					 System.out.println(predict.predicted() + " and was " + predict.actual());
+					 System.out.println("If this is working, the actual stance is " + correctHeadline.actualStance);
+					 System.out.println();
+					 correctHeadline.correctlyClassed=true;
+					 correctHeadline.setCorrectlyClassified();
+					 correctHeadline.predictedClass = predict.predicted();
+					 testingResults.add(correctHeadline);
+				 } else {
+					 Headline correctHeadline = relatedHeadlines.get(predictionCounter);
+					 System.out.println("Incorrectly classified:");
+					 System.out.println(correctHeadline.headlineString);
+					 System.out.println(predict.toString());
+					 System.out.println(predict.predicted() + " and was " + predict.actual());
+					 System.out.println();
+					 correctHeadline.predictedClass = predict.predicted();
+					 testingResults.add(correctHeadline);
+				 }
+				 predictionCounter++;
 			 }
-			 predictionCounter++;
-		 }
 
-		String classDeets = eTest.toClassDetailsString();
-		System.out.println("Class Details " + classDeets);
+			String classDeets = eTest.toClassDetailsString();
+			System.out.println("Class Details " + classDeets);
 
-		// Print the result à la Weka explorer:
-		String strSummary = eTest.toSummaryString();
-		System.out.println("Performance Summary " + strSummary);
+			// Print the result à la Weka explorer:
+			String strSummary = eTest.toSummaryString();
+			System.out.println("Performance Summary " + strSummary);
+		} else {
+			// Declare the first Attribute, the tf_idf
+			// Attribute Attribute1 = new Attribute("tf-idf");
+			// Declare second Attribute, whether it is agreeable or not
+			Attribute Attribute2 = new Attribute("agree");
+			// Declare third Attribute, whether it is disagreeable or not
+			Attribute Attribute3 = new Attribute("disagree");
+			// Declare fourth Attribute, whether it is discussive or not
+			Attribute Attribute4 = new Attribute("discuss");
+			// Declare fifth Attribute, whether the sentiment is positive or not
+			Attribute Attribute5 = new Attribute("positive");
+			// Declare sixth attribute, sentiment analysis
+			Attribute Attribute6 = new Attribute("sentiment");
+
+			// Declare the class attribute along with its values
+			ArrayList<String> fvClassVal = new ArrayList<String>();
+			fvClassVal.add("unrelated");
+			fvClassVal.add("agree");
+			fvClassVal.add("disagree");
+			fvClassVal.add("discuss");
+			Attribute ClassAttribute = new Attribute("the_class", fvClassVal);
+
+			// Declare the feature vector
+			ArrayList<Attribute> fvWekaAttributes = new ArrayList<Attribute>();
+			// fvWekaAttributes.add(Attribute1);
+			fvWekaAttributes.add(Attribute2);
+			fvWekaAttributes.add(Attribute3);
+			fvWekaAttributes.add(Attribute4);
+			fvWekaAttributes.add(Attribute5);
+			fvWekaAttributes.add(Attribute6);
+			fvWekaAttributes.add(ClassAttribute);
+
+			// Create an empty training set
+			official_set = new Instances("Train Data", fvWekaAttributes, 10000);
+			// Set class index
+			official_set.setClassIndex(fvWekaAttributes.size() - 1);
+
+			ArrayList<Headline> relatedHeadlines = new ArrayList<Headline>();
+			
+			for (Headline headline : officialHeadlines) {
+				if (!headline.getBodyID().equals("Body ID")) {
+					if (headline.related) {
+						// Keeping track of any mistakes made by the classifier
+						relatedHeadlines.add(headline);
+						// Create the instance
+						Instance iExample = new DenseInstance(6);
+						// iExample.setValue((Attribute) fvWekaAttributes.get(0), headline.getTFIDF());
+						iExample.setValue((Attribute) fvWekaAttributes.get(0), headline.agrees);
+						iExample.setValue((Attribute) fvWekaAttributes.get(1), headline.disagrees);
+						iExample.setValue((Attribute) fvWekaAttributes.get(2), headline.discusses);
+						iExample.setValue((Attribute) fvWekaAttributes.get(3), headline.isPositive());
+						iExample.setValue((Attribute) fvWekaAttributes.get(4), headline.sentiment);
+						String headlineStance = headline.actualStance;
+						iExample.setValue((Attribute) fvWekaAttributes.get(5), headlineStance);
+						// add the instance
+						official_set.add(iExample);
+					}
+				}
+			}
+			// Test the model
+			Evaluation eTest = new Evaluation(official_set);
+			eTest.evaluateModel(cModel, official_set);
+			
+			 ArrayList<Prediction> Predictions = eTest.predictions();
+			 int predictionCounter = 0;
+			 for (Prediction predict : Predictions) {
+				 if (predict.predicted() == predict.actual()) {
+					 Headline correctHeadline = relatedHeadlines.get(predictionCounter);
+					 System.out.println("Correctly classified:");
+					 System.out.println(correctHeadline.headlineString);
+					 System.out.println(predict.toString());
+					 System.out.println(predict.predicted() + " and was " + predict.actual());
+					 System.out.println("If this is working, the actual stance is " + correctHeadline.actualStance);
+					 System.out.println();
+					 correctHeadline.correctlyClassed=true;
+					 correctHeadline.setCorrectlyClassified();
+					 correctHeadline.predictedClass = predict.predicted();
+					 officialResults.add(correctHeadline);
+				 } else {
+					 Headline correctHeadline = relatedHeadlines.get(predictionCounter);
+					 System.out.println("Incorrectly classified:");
+					 System.out.println(correctHeadline.headlineString);
+					 System.out.println(predict.toString());
+					 System.out.println(predict.predicted() + " and was " + predict.actual());
+					 System.out.println();
+					 correctHeadline.predictedClass = predict.predicted();
+					 officialResults.add(correctHeadline);
+				 }
+				 predictionCounter++;
+			 }
+
+			String classDeets = eTest.toClassDetailsString();
+			System.out.println("Class Details " + classDeets);
+
+			// Print the result à la Weka explorer:
+			String strSummary = eTest.toSummaryString();
+			System.out.println("Performance Summary " + strSummary);
+		}
+		
 
 	}
 
@@ -413,7 +514,7 @@ public class FakeNewsChallengeMain {
 
 		BufferedWriter bw = null;
 		FileWriter fw = null;
-		int loadScreen = Math.round(numberOfHeadlines / 75);
+		int loadScreen = Math.round(trainingHeadlines.size() / 75);
 		int counter = 0;
 
 		try {
@@ -615,6 +716,8 @@ public class FakeNewsChallengeMain {
 						headline.addDisagreePoints();
 					}
 				}
+				
+				System.out.println(headline.originalHeadline);
 
 				Query q = new QueryParser("text", analyzer).parse(query);
 				int hits = 10;
@@ -696,6 +799,7 @@ public class FakeNewsChallengeMain {
 
 		// Preprocess for each headline in the list
 		for (Headline headline : trainingHeadlines) {
+			System.out.println(headline.originalHeadline);
 			// Calculate the different scores for the four classes
 			MyDocument mappedDoc = articles.get(headline.getBodyID());
 			float tf_idf = (float) 0.0;
@@ -836,28 +940,34 @@ public class FakeNewsChallengeMain {
 			} else {
 				d = new MyDocument(theArticle, bodyID);
 				officialArticles.put(bodyID, d);
-			}	
+			}		
 		}
 	}
-	public static void createTheOfficialHeadline(String headline, String bodyID, String actualStance) {
-		Headline h = new Headline(headline, bodyID, actualStance);
-		officialHeadlines.add(h);
+	public static void createTheOfficialHeadline(String headline, String bodyID) {
+		if(!bodyID.equals("Body ID")) {
+			Headline h = new Headline(headline, bodyID, "unrelated");
+			officialHeadlines.add(h);	
+		}
 	}
 
 	/**
 	 * Called to create a headline for the training headlines List of headlines
 	 **/
 	public static void createTheTrainHeadline(String headline, String bodyID, String actualStance) {
-		Headline h = new Headline(headline, bodyID, actualStance);
-		trainingHeadlines.add(h);
+		if(!bodyID.equals("Body ID")) {
+			Headline h = new Headline(headline, bodyID, actualStance);
+			trainingHeadlines.add(h);	
+		}
 	}
 
 	/**
 	 * Called to create a headline for the testingHeadlines List of headlines
 	 **/
 	public static void createTheTestHeadline(String headline, String bodyID, String actualStance) {
-		Headline h = new Headline(headline, bodyID, actualStance);
-		testingHeadlines.add(h);
+		if(!bodyID.equals("Body ID")) {
+			Headline h = new Headline(headline, bodyID, actualStance);
+			testingHeadlines.add(h);	
+		}
 	}
 
 	/** Add a document to the collection using Lucene's IndexWriter **/
@@ -882,23 +992,43 @@ public class FakeNewsChallengeMain {
 	 */
 	public static void getFinalScore(int phase) {
 		
-		int[][] confusionMatrix = new int[4][4];
-		float correct = 0.0F, incorrect = 0.0F;
-		for(Headline headline:testingResults) {
-			if(headline.correctlyClassed) {
-				correct++;
-			} else {
-				incorrect++;
+		if(phase == 1) {
+			int[][] confusionMatrix = new int[4][4];
+			float correct = 0.0F, incorrect = 0.0F;
+			for(Headline headline:testingResults) {
+				if(headline.correctlyClassed) {
+					correct++;
+				} else {
+					incorrect++;
+				}
+				confusionMatrix[(int) headline.realClass][(int) headline.predictedClass]++;
 			}
-			confusionMatrix[(int) headline.realClass][(int) headline.predictedClass]++;
+			System.out.println("Correct percentage was " + (float)correct/testingResults.size());
+			System.out.println("Incorrect percentage was " + (float)incorrect/testingResults.size());
+			System.out.println("\t    unrelated | agree | disagree | discuss");
+			System.out.println("unrelated: " + String.format("%06d",confusionMatrix[0][0]) + " | " + String.format("%06d",confusionMatrix[0][1]) + " | " + String.format("%06d",confusionMatrix[0][2]) + " | " + String.format("%06d",confusionMatrix[0][3]));
+			System.out.println("agree    : " + String.format("%06d",confusionMatrix[1][0]) + " | " + String.format("%06d",confusionMatrix[1][1]) + " | " + String.format("%06d",confusionMatrix[1][2]) + " | " + String.format("%06d",confusionMatrix[1][3]));
+			System.out.println("disagree : " + String.format("%06d",confusionMatrix[2][0]) + " | " + String.format("%06d",confusionMatrix[2][1]) + " | " + String.format("%06d",confusionMatrix[2][2]) + " | " + String.format("%06d",confusionMatrix[2][3]));
+			System.out.println("discuss  : " + String.format("%06d",confusionMatrix[3][0]) + " | " + String.format("%06d",confusionMatrix[3][1]) + " | " + String.format("%06d",confusionMatrix[3][2]) + " | " + String.format("%06d",confusionMatrix[3][3]));
+		} else {
+			int[][] confusionMatrix = new int[4][4];
+			float correct = 0.0F, incorrect = 0.0F;
+			for(Headline headline:officialResults) {
+				if(headline.correctlyClassed) {
+					correct++;
+				} else {
+					incorrect++;
+				}
+				confusionMatrix[(int) headline.realClass][(int) headline.predictedClass]++;
+			}
+			System.out.println("Correct percentage was " + (float)correct/testingResults.size());
+			System.out.println("Incorrect percentage was " + (float)incorrect/testingResults.size());
+			System.out.println("\t    unrelated | agree | disagree | discuss");
+			System.out.println("unrelated: " + String.format("%06d",confusionMatrix[0][0]) + " | " + String.format("%06d",confusionMatrix[0][1]) + " | " + String.format("%06d",confusionMatrix[0][2]) + " | " + String.format("%06d",confusionMatrix[0][3]));
+			System.out.println("agree    : " + String.format("%06d",confusionMatrix[1][0]) + " | " + String.format("%06d",confusionMatrix[1][1]) + " | " + String.format("%06d",confusionMatrix[1][2]) + " | " + String.format("%06d",confusionMatrix[1][3]));
+			System.out.println("disagree : " + String.format("%06d",confusionMatrix[2][0]) + " | " + String.format("%06d",confusionMatrix[2][1]) + " | " + String.format("%06d",confusionMatrix[2][2]) + " | " + String.format("%06d",confusionMatrix[2][3]));
+			System.out.println("discuss  : " + String.format("%06d",confusionMatrix[3][0]) + " | " + String.format("%06d",confusionMatrix[3][1]) + " | " + String.format("%06d",confusionMatrix[3][2]) + " | " + String.format("%06d",confusionMatrix[3][3]));
 		}
-		System.out.println("Correct percentage was " + (float)correct/testingResults.size());
-		System.out.println("Incorrect percentage was " + (float)incorrect/testingResults.size());
-		
-		System.out.println(confusionMatrix[0][0] + " | " + confusionMatrix[0][1] + " | " + confusionMatrix[0][2] + " | " + confusionMatrix[0][3]);
-		System.out.println(confusionMatrix[1][0] + " | " + confusionMatrix[1][1] + " | " + confusionMatrix[1][2] + " | " + confusionMatrix[1][3]);
-		System.out.println(confusionMatrix[2][0] + " | " + confusionMatrix[2][1] + " | " + confusionMatrix[2][2] + " | " + confusionMatrix[2][3]);
-		System.out.println(confusionMatrix[3][0] + " | " + confusionMatrix[3][1] + " | " + confusionMatrix[3][2] + " | " + confusionMatrix[3][3]);
 
 	}
 	
@@ -907,34 +1037,61 @@ public class FakeNewsChallengeMain {
 	 * out by the scroing mechanism. The output is as follows, in a .csv file:
 	 * "headline", "bodyID", "predicted stance", "classification score"
 	 */
-	public static void generateOutputCSV(String filename) throws IOException {
+	public static void generateOutputCSV(String filename, int phase) throws IOException {
 		
-		// CSVWriter writer = new CSVWriter(new FileWriter("test_results.csv"), '\t');
-		CSVWriter writer = new CSVWriter(new FileWriter(filename), ',');
-		// feed in your array (or convert your data to an array)
-		System.out.println("Size of the testing results is " + testingResults.size());
-		for(Headline headline : testingResults) {
-			String[] entries = new String[3];
-			entries[0]=headline.originalHeadline;
-			entries[1]=headline.bodyID;
-			entries[2]=headline.getPredictedStance();
-			writer.writeNext(entries);
+		if(phase == 1) {
+			// CSVWriter writer = new CSVWriter(new FileWriter("test_results.csv"), '\t');
+			CSVWriter writer = new CSVWriter(new FileWriter(filename), ',');
+			// feed in your array (or convert your data to an array)
+			System.out.println("Size of the testing results is " + testingResults.size());
+			for(Headline headline : testingResults) {
+				String[] entries = new String[3];
+				entries[0]=headline.originalHeadline;
+				entries[1]=headline.bodyID;
+				entries[2]=headline.getPredictedStance();
+				writer.writeNext(entries);
+			}
+			writer.close();
+			
+			
+			BufferedWriter br = new BufferedWriter(new FileWriter("other" + filename));
+			StringBuilder sb = new StringBuilder();
+			  
+			for(Headline headline:testingResults) {
+				sb.append(headline.originalHeadline + '\t');
+				sb.append(headline.bodyID + '\t');
+				sb.append(headline.getPredictedStance() + '\n');
+			}		
+			  
+			br.write(sb.toString());
+			br.close();
+		} else {
+			// CSVWriter writer = new CSVWriter(new FileWriter("test_results.csv"), '\t');
+			CSVWriter writer = new CSVWriter(new FileWriter(filename), ',');
+			// feed in your array (or convert your data to an array)
+			System.out.println("Size of the testing results is " + officialResults.size());
+			for(Headline headline : officialResults) {
+				String[] entries = new String[3];
+				entries[0]=headline.originalHeadline;
+				entries[1]=headline.bodyID;
+				entries[2]=headline.getPredictedStance();
+				writer.writeNext(entries);
+			}
+			writer.close();
+			
+			
+			BufferedWriter br = new BufferedWriter(new FileWriter("other" + filename));
+			StringBuilder sb = new StringBuilder();
+			  
+			for(Headline headline:officialResults) {
+				sb.append(headline.originalHeadline + '\t');
+				sb.append(headline.bodyID + '\t');
+				sb.append(headline.getPredictedStance() + '\n');
+			}		
+			  
+			br.write(sb.toString());
+			br.close();
 		}
-		writer.close();
-		
-		
-		BufferedWriter br = new BufferedWriter(new FileWriter("other" + filename));
-		StringBuilder sb = new StringBuilder();
-		  
-		for(Headline headline:testingResults) {
-			sb.append(headline.originalHeadline + '\t');
-			sb.append(headline.bodyID + '\t');
-			sb.append(headline.getPredictedStance() + '\n');
-		}		
-		  
-		br.write(sb.toString());
-		br.close();
-		
 	}
 
 	/**************************************************************************
@@ -1297,12 +1454,20 @@ public class FakeNewsChallengeMain {
 		
 		public String getPredictedStance() {
 			String returnVal = "";
-			//TODO make the return of this a String of the predicted type
-			// i.e. turn a numeric value into a string
 			if(this.correctlyClassed) {
 				returnVal=this.actualStance;
 			} else {
-				returnVal="wrongClass";
+				if(this.predictedClass==0.0F) {
+					returnVal="unrelated"; 
+				} else if(this.predictedClass==1.0F) {
+					returnVal="agree";
+				} else if(this.predictedClass==2.0F) {
+					returnVal="disagree";
+				} else if(this.predictedClass==3.0F) {
+					returnVal="discuss";
+				} else {
+					returnVal="wrongClass";	
+				}
 			}
 			return returnVal;
 		}
