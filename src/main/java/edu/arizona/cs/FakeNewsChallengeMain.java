@@ -599,6 +599,16 @@ public class FakeNewsChallengeMain {
 						headline.realClass=0.0F;
 						headline.predictedClass=0.0F;
 						testingResults.add(headline);
+					} else {
+						if(headline.actualStance.equals("agree")) {
+							headline.realClass=1.0F;
+						} else if(headline.actualStance.equals("disagree")) {
+							headline.realClass=2.0F;
+						} else {
+							headline.realClass=3.0F;
+						}
+						headline.predictedClass=0.0F;
+						testingResults.add(headline);
 					}
 				}
 
