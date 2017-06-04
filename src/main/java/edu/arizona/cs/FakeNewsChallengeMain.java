@@ -227,8 +227,8 @@ public class FakeNewsChallengeMain {
 			e.printStackTrace();
 		}
 		
-		getFinalScore(2);
 		generateOutputCSV("phase_two_testing.csv", 2);
+		getFinalScore(2);
 
 	}
 
@@ -375,23 +375,12 @@ public class FakeNewsChallengeMain {
 			 for (Prediction predict : Predictions) {
 				 if (predict.predicted() == predict.actual()) {
 					 Headline correctHeadline = relatedHeadlines.get(predictionCounter);
-					 System.out.println("Correctly classified:");
-					 System.out.println(correctHeadline.headlineString);
-					 System.out.println(predict.toString());
-					 System.out.println(predict.predicted() + " and was " + predict.actual());
-					 System.out.println("If this is working, the actual stance is " + correctHeadline.actualStance);
-					 System.out.println();
 					 correctHeadline.correctlyClassed=true;
 					 correctHeadline.setCorrectlyClassified();
 					 correctHeadline.predictedClass = predict.predicted();
 					 testingResults.add(correctHeadline);
 				 } else {
 					 Headline correctHeadline = relatedHeadlines.get(predictionCounter);
-					 System.out.println("Incorrectly classified:");
-					 System.out.println(correctHeadline.headlineString);
-					 System.out.println(predict.toString());
-					 System.out.println(predict.predicted() + " and was " + predict.actual());
-					 System.out.println();
 					 correctHeadline.predictedClass = predict.predicted();
 					 testingResults.add(correctHeadline);
 				 }
@@ -472,23 +461,12 @@ public class FakeNewsChallengeMain {
 			 for (Prediction predict : Predictions) {
 				 if (predict.predicted() == predict.actual()) {
 					 Headline correctHeadline = relatedHeadlines.get(predictionCounter);
-					 System.out.println("Correctly classified:");
-					 System.out.println(correctHeadline.headlineString);
-					 System.out.println(predict.toString());
-					 System.out.println(predict.predicted() + " and was " + predict.actual());
-					 System.out.println("If this is working, the actual stance is " + correctHeadline.actualStance);
-					 System.out.println();
 					 correctHeadline.correctlyClassed=true;
 					 correctHeadline.setCorrectlyClassified();
 					 correctHeadline.predictedClass = predict.predicted();
 					 officialResults.add(correctHeadline);
 				 } else {
 					 Headline correctHeadline = relatedHeadlines.get(predictionCounter);
-					 System.out.println("Incorrectly classified:");
-					 System.out.println(correctHeadline.headlineString);
-					 System.out.println(predict.toString());
-					 System.out.println(predict.predicted() + " and was " + predict.actual());
-					 System.out.println();
 					 correctHeadline.predictedClass = predict.predicted();
 					 officialResults.add(correctHeadline);
 				 }
@@ -716,8 +694,6 @@ public class FakeNewsChallengeMain {
 						headline.addDisagreePoints();
 					}
 				}
-				
-				System.out.println(headline.originalHeadline);
 
 				Query q = new QueryParser("text", analyzer).parse(query);
 				int hits = 10;
@@ -799,7 +775,6 @@ public class FakeNewsChallengeMain {
 
 		// Preprocess for each headline in the list
 		for (Headline headline : trainingHeadlines) {
-			System.out.println(headline.originalHeadline);
 			// Calculate the different scores for the four classes
 			MyDocument mappedDoc = articles.get(headline.getBodyID());
 			float tf_idf = (float) 0.0;
@@ -1005,7 +980,7 @@ public class FakeNewsChallengeMain {
 			}
 			System.out.println("Correct percentage was " + (float)correct/testingResults.size());
 			System.out.println("Incorrect percentage was " + (float)incorrect/testingResults.size());
-			System.out.println("\t    unrelated | agree | disagree | discuss");
+			System.out.println("\tunrelated | agree | disagree | discuss");
 			System.out.println("unrelated: " + String.format("%06d",confusionMatrix[0][0]) + " | " + String.format("%06d",confusionMatrix[0][1]) + " | " + String.format("%06d",confusionMatrix[0][2]) + " | " + String.format("%06d",confusionMatrix[0][3]));
 			System.out.println("agree    : " + String.format("%06d",confusionMatrix[1][0]) + " | " + String.format("%06d",confusionMatrix[1][1]) + " | " + String.format("%06d",confusionMatrix[1][2]) + " | " + String.format("%06d",confusionMatrix[1][3]));
 			System.out.println("disagree : " + String.format("%06d",confusionMatrix[2][0]) + " | " + String.format("%06d",confusionMatrix[2][1]) + " | " + String.format("%06d",confusionMatrix[2][2]) + " | " + String.format("%06d",confusionMatrix[2][3]));
@@ -1021,9 +996,9 @@ public class FakeNewsChallengeMain {
 				}
 				confusionMatrix[(int) headline.realClass][(int) headline.predictedClass]++;
 			}
-			System.out.println("Correct percentage was " + (float)correct/testingResults.size());
-			System.out.println("Incorrect percentage was " + (float)incorrect/testingResults.size());
-			System.out.println("\t    unrelated | agree | disagree | discuss");
+			System.out.println("Correct percentage was " + (float)correct/officialResults.size());
+			System.out.println("Incorrect percentage was " + (float)incorrect/officialResults.size());
+			System.out.println("\tunrelated | agree | disagree | discuss");
 			System.out.println("unrelated: " + String.format("%06d",confusionMatrix[0][0]) + " | " + String.format("%06d",confusionMatrix[0][1]) + " | " + String.format("%06d",confusionMatrix[0][2]) + " | " + String.format("%06d",confusionMatrix[0][3]));
 			System.out.println("agree    : " + String.format("%06d",confusionMatrix[1][0]) + " | " + String.format("%06d",confusionMatrix[1][1]) + " | " + String.format("%06d",confusionMatrix[1][2]) + " | " + String.format("%06d",confusionMatrix[1][3]));
 			System.out.println("disagree : " + String.format("%06d",confusionMatrix[2][0]) + " | " + String.format("%06d",confusionMatrix[2][1]) + " | " + String.format("%06d",confusionMatrix[2][2]) + " | " + String.format("%06d",confusionMatrix[2][3]));
